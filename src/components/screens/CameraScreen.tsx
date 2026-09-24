@@ -14,6 +14,7 @@ export function CameraScreen() {
   const lastMessage = useStore(controller.announcer.lastMessage);
   const session = useStore(controller.session.store);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useFocusRequest(headingRef, "heading");
@@ -28,6 +29,8 @@ export function CameraScreen() {
 
   const docInProgress = (session.doc?.pages.length ?? 0) > 0;
   const heading = ui.addingPage ? `Add page ${ui.addingPage}` : "Camera";
+  const cameraFailed = ui.cameraStatus === "error";
+  const openPhoneCamera = () => fileRef.current?.click();
 
   return (
     <main className="relative h-dvh overflow-hidden bg-black text-white">
@@ -61,15 +64,44 @@ export function CameraScreen() {
           <div className="flex flex-wrap gap-3">
             {docInProgress && <Button label="Back to reading" onClick={() => controller.backToReading()} />}
             <Button label="Settings" onClick={() => controller.openSettings()} />
+            {!cameraFailed && <Button label="Use phone camera instead" size="normal" onClick={openPhoneCamera} />}
           </div>
-          <button
-            type="button"
-            onClick={() => void controller.captureManual()}
-            aria-disabled={ui.capturing}
-            className="h-[33dvh] min-h-28 w-full rounded-3xl border-4 border-yellow-300 bg-yellow-300 text-5xl font-extrabold text-black"
-          >
-            {ui.capturing ? "Capturing…" : "Capture"}
-          </button>
+          {/* The iPhone's own camera app: works in other apps' browsers and when the live
+              preview fails. Its controls are labelled for VoiceOver. */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="hidden"
+            data-testid="phone-camera-input"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void controller.captureFromFile(file);
+            }}
+          />
+          {cameraFailed ? (
+            <button
+              type="button"
+              onClick={openPhoneCamera}
+              aria-disabled={ui.capturing}
+              className="h-[33dvh] min-h-28 w-full rounded-3xl border-4 border-yellow-300 bg-yellow-300 px-4 text-4xl font-extrabold text-black"
+            >
+              {ui.capturing ? "Reading the photo…" : "Use phone camera instead"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void controller.captureManual()}
+              aria-disabled={ui.capturing}
+              className="h-[33dvh] min-h-28 w-full rounded-3xl border-4 border-yellow-300 bg-yellow-300 text-5xl font-extrabold text-black"
+            >
+              {ui.capturing ? "Capturing…" : "Capture"}
+            </button>
+          )}
         </div>
       </div>
     </main>

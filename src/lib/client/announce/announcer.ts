@@ -29,16 +29,19 @@ export class Announcer {
     },
   ) {}
 
-  say(text: string, opts: AnnounceOptions = {}): void {
+  /** Returns false when a low-priority message was dropped because something else was speaking. */
+  say(text: string, opts: AnnounceOptions = {}): boolean {
     const message = text.trim();
-    if (!message) return;
-    this.lastMessage.set(message);
+    if (!message) return false;
     if (this.deps.channel() === "speech") {
-      this.deps.speaker.speak(message, { priority: opts.priority ?? "high", lang: this.deps.uiLang });
+      const handle = this.deps.speaker.speak(message, { priority: opts.priority ?? "high", lang: this.deps.uiLang });
+      if (handle?.dropped) return false;
     } else if (opts.alert) {
       this.deps.live.alert(message);
     } else {
       this.deps.live.status(message);
     }
+    this.lastMessage.set(message);
+    return true;
   }
 }

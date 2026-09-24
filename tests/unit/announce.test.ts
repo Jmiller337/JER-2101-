@@ -9,7 +9,7 @@ function setup(channel: Channel) {
   const alert = document.createElement("div");
   const live = new LiveRegions(globalTimers);
   live.attach(status, alert);
-  const speak = vi.fn();
+  const speak = vi.fn(() => ({ id: 1, dropped: false }));
   const announcer = new Announcer({ speaker: { speak }, live, channel: () => channel, uiLang: "en" });
   return { status, alert, live, speak, announcer };
 }

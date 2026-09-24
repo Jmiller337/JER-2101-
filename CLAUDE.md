@@ -56,3 +56,5 @@ Decisions made while building that `PROMPT.md` did not settle. Each has a reason
 - **ESLint 9, not 10.** ESLint 10 crashes `eslint-plugin-react` (used by `eslint-config-next` 16.3), so ESLint stays on 9.39 until the Next.js config supports 10.
 - **TypeScript 5.9, not 7.** TypeScript 7 is the new native compiler; `typescript-eslint` 8 and Next's build-time type check are validated against 5.x.
 - **Playwright pinned to 1.56.1.** It matches the Chromium build preinstalled in the build sandbox. `playwright.config.ts` uses `/opt/pw-browsers/chromium` when it exists and otherwise the browser from `npx playwright install chromium`.
+- **Framing thresholds** live in `FRAMING` in `src/lib/client/vision/framing.ts` and were tuned on synthetic frames and a generated video, not on a real iPhone. The ones most likely to need adjusting on the device are `motion` (hand tremor), `steadyMs`, and `tooSmallCoverage`.
+- **Direction cues** assume the phone is held flat over a page on a table with its top edge pointing away from the user ("Move away from you" means toward the top of the phone). The sign must be confirmed on a real iPhone (see `docs/TESTING-ON-IPHONE.md`).

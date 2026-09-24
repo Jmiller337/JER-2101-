@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { expectSpoken, openApp, PASSCODE, utterances } from "./helpers";
+import { expectSpoken, openApp, openToCamera, PASSCODE, utterances } from "./helpers";
 
-test("first launch in read-aloud mode: capture a page and hear it read", async ({ page }) => {
+test("first launch in read-aloud mode: the page is captured automatically and read", async ({ page }) => {
   await openApp(page);
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expectSpoken(page, /^Document Reader\. Do you use VoiceOver\?/);
@@ -20,7 +20,7 @@ test("first launch in read-aloud mode: capture a page and hear it read", async (
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
   await expectSpoken(page, /^Lay the phone flat on the page/);
 
-  await page.getByRole("button", { name: "Capture" }).click();
+  // The fake camera shows a steady, fully visible page: automatic capture fires on its own.
   await expectSpoken(page, "Got it. Reading.");
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
@@ -39,10 +39,8 @@ test("first launch in read-aloud mode: capture a page and hear it read", async (
 });
 
 test("pause reports the position and play resumes", async ({ page }) => {
-  await openApp(page, { mode: "readAloud", passcode: true });
+  await openToCamera(page);
   await page.evaluate(() => ((window as unknown as { __speechMsPerChar: number }).__speechMsPerChar = 60));
-  await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
   await page.getByRole("button", { name: "Capture" }).click();
   await expectSpoken(page, "Riverside Water Utility");
   await page.getByRole("button", { name: "Pause" }).click();

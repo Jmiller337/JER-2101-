@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { captureAndRead, expectNoAxeViolations, openApp, openToCamera, PASSCODE } from "./helpers";
 
 test("every screen passes axe in read-aloud mode", async ({ page }) => {
-  await openApp(page);
+  // First launch (mode not chosen yet), with automatic capture off so the camera screen stays.
+  await openApp(page, { settings: { mode: null, autoCapture: false } });
   await expectNoAxeViolations(page, "start");
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Do you use VoiceOver?" })).toBeVisible();

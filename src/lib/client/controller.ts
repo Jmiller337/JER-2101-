@@ -5,6 +5,7 @@ import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
 import { Sounds } from "./audio/sounds";
 import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
+import { FrameSampler } from "./camera/frameSampler";
 import { imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
 import type { Doc, DocPage } from "./document/model";
 import { DocumentSession } from "./document/session";
@@ -25,6 +26,7 @@ import { Speaker, type Timers } from "./speech/speaker";
 import { pickVoice, voicesForLanguage } from "./speech/voices";
 import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
+import { CuePolicy, FramingTracker, type Situation } from "./vision/framing";
 import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
@@ -64,6 +66,8 @@ export interface ControllerEnv {
   session: StorageLike | null;
   api: ApiClient;
   wakeLock?: { setWanted(wanted: boolean): void };
+  /** Monotonic clock in milliseconds. */
+  now?: () => number;
 }
 
 export function browserEnv(): ControllerEnv {
@@ -106,6 +110,13 @@ export class AppController {
   private resumeOnReturn = false;
   private pausedByHide = false;
   private cameraIntroPending: "full" | "addPage" | "none" = "full";
+  private readonly sampler = new FrameSampler();
+  private tracker = new FramingTracker();
+  private readonly cuePolicy = new CuePolicy();
+  private analysisTimer: unknown = null;
+  /** Automatic capture fires at most once per visit to the camera screen (PROMPT.md 6.3). */
+  private armed = false;
+  private torchTried = false;
   private readonly cleanups: Array<() => void> = [];
 
   constructor(env: ControllerEnv = browserEnv()) {
@@ -186,8 +197,8 @@ export class AppController {
     return this.channel() === "speech";
   }
 
-  say(text: string, opts?: AnnounceOptions): void {
-    this.announcer.say(text, opts);
+  say(text: string, opts?: AnnounceOptions): boolean {
+    return this.announcer.say(text, opts);
   }
 
   private fail(message: string, detail?: string): void {
@@ -314,6 +325,7 @@ export class AppController {
       this.resolveCameraWaiters(camera);
       console.info("camera started", camera.info());
       this.speakCameraIntro();
+      this.startGuidance();
     } catch (err) {
       if (token !== this.videoToken) return;
       const kind: CameraErrorKind = err instanceof CameraError ? err.kind : "unknown";
@@ -348,6 +360,7 @@ export class AppController {
   detachVideo(): void {
     this.videoToken += 1;
     this.videoEl = null;
+    this.stopGuidance();
     this.resolveCameraWaiters(null);
     if (this.camera) {
       void this.camera.setTorch(false);
@@ -355,6 +368,101 @@ export class AppController {
       this.camera = null;
     }
     if (this.ui.get().cameraStatus !== "off") this.ui.update({ cameraStatus: "off" });
+  }
+
+  // -------------------------------------------------------------------------
+  // Framing guidance and automatic capture (PROMPT.md 6.2 and 6.3)
+  // -------------------------------------------------------------------------
+
+  private startGuidance(): void {
+    this.stopGuidance();
+    this.tracker = new FramingTracker();
+    this.cuePolicy.reset();
+    this.armed = true;
+    this.torchTried = false;
+    this.scheduleAnalysis(250);
+  }
+
+  private stopGuidance(): void {
+    if (this.analysisTimer !== null) {
+      this.env.timers.clearTimeout(this.analysisTimer);
+      this.analysisTimer = null;
+    }
+  }
+
+  /** About seven frames a second on a 160-pixel-wide copy of the preview. */
+  private scheduleAnalysis(ms = 140): void {
+    this.stopGuidance();
+    this.analysisTimer = this.env.timers.setTimeout(() => this.analyzeFrame(), ms);
+  }
+
+  private now(): number {
+    return this.env.now ? this.env.now() : performance.now();
+  }
+
+  private analyzeFrame(): void {
+    this.analysisTimer = null;
+    const camera = this.camera;
+    if (!camera || this.ui.get().screen !== "camera") return;
+    if (this.ui.get().capturing || document.visibilityState !== "visible") {
+      this.scheduleAnalysis();
+      return;
+    }
+    const video = camera.video;
+    const frame = this.sampler.sample(video, video.videoWidth, video.videoHeight);
+    if (frame) {
+      const now = this.now();
+      const situation = this.tracker.update(frame, now);
+      if (situation.kind === "ready" && this.armed && this.settings.get().autoCapture) {
+        void this.autoCapture();
+        return;
+      }
+      this.guide(situation, now);
+    }
+    this.scheduleAnalysis();
+  }
+
+  private guide(situation: Situation, now: number): void {
+    const camera = this.camera;
+    if (situation.kind === "dark" && camera && !this.torchTried && camera.hasTorch()) {
+      this.torchTried = true;
+      void camera.setTorch(true).then((on) => {
+        if (on) this.say("It's dark, so I turned on the light.", { priority: "low" });
+      });
+      return;
+    }
+    const settings = this.settings.get();
+    const cue = this.cuePolicy.next(situation, now, { guidance: settings.guidance, autoCapture: settings.autoCapture });
+    if (cue && this.say(cue, { priority: "low" })) this.cuePolicy.spoken(cue, now);
+  }
+
+  private async autoCapture(): Promise<void> {
+    const camera = this.camera;
+    if (!camera || this.ui.get().capturing) return;
+    this.armed = false;
+    this.ui.update({ capturing: true });
+    this.sounds.shutter();
+    try {
+      const still = await camera.captureStill();
+      const sample = this.sampler.sample(still.source, still.width, still.height);
+      if (sample && !this.tracker.isStillSharp(sample)) {
+        if (typeof ImageBitmap !== "undefined" && still.source instanceof ImageBitmap) still.source.close();
+        this.retryAutoCapture("Blurry. Hold still.");
+        return;
+      }
+      await this.processCapture(still.source, still.width, still.height);
+    } catch (err) {
+      console.warn("automatic capture failed", err);
+      this.retryAutoCapture("I couldn't take the picture. Hold still and I'll try again.");
+    }
+  }
+
+  private retryAutoCapture(message: string): void {
+    this.ui.update({ capturing: false });
+    this.tracker.resetSteady();
+    this.armed = true;
+    this.say(message);
+    this.scheduleAnalysis(600);
   }
 
   private speakCameraIntro(): void {
@@ -369,6 +477,7 @@ export class AppController {
   /** The Capture button: takes the picture at once, with no framing checks (principle 4). */
   async captureManual(): Promise<void> {
     if (this.ui.get().capturing) return;
+    this.armed = false;
     this.ui.update({ capturing: true });
     const camera = await this.waitForCamera(5000);
     if (!camera) {
@@ -382,6 +491,7 @@ export class AppController {
       await this.processCapture(still.source, still.width, still.height);
     } catch (err) {
       this.ui.update({ capturing: false });
+      this.armed = true;
       this.fail("I couldn't take the picture. Press Capture to try again.", err instanceof Error ? err.message : undefined);
     }
   }
@@ -389,6 +499,7 @@ export class AppController {
   /** A photo chosen with the phone's own camera app ("Use phone camera instead"). */
   async captureFromFile(file: File): Promise<void> {
     if (this.ui.get().capturing) return;
+    this.armed = false;
     this.ui.update({ capturing: true });
     try {
       const image = await imageFromFile(file);

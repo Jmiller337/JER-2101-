@@ -14,7 +14,7 @@ test("VoiceOver mode: status goes to the live region and the app voice stays sil
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
   await expect.poll(() => liveStatus(page)).toMatch(/^Lay the phone flat on the page/);
 
-  await page.getByRole("button", { name: "Capture" }).click();
+  // Automatic capture (the fake camera shows a steady page).
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();
   await expect.poll(() => liveStatus(page)).toBe("Page 1 ready. 7 paragraphs. Swipe right to read.");
 

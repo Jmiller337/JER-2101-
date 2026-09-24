@@ -26,6 +26,23 @@ Before starting:
 - [ ] At the end: "End of document. Press Play to hear it again, Ask a question, or Add page."
 - [ ] The sentence being read is highlighted in yellow and scrolls into view.
 
+## 2a. Framing guidance and automatic capture
+
+Hold the phone flat above the page on a table, top of the phone pointing away from you.
+
+- [ ] With nothing under the camera the app says "I can't see a page. Lift the phone slowly."
+- [ ] Slide the phone so the page is cut off on the left. The app says "Move left." Moving the phone to the left brings the page into view. Repeat for right ("Move right."), top ("Move away from you."), and bottom ("Move toward you."). **If any direction is backwards, write down which.**
+- [ ] Held very close (page overflowing the screen): "Lift the phone higher." Held far away: "Move closer to the page."
+- [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and reads the page. No button press needed.
+- [ ] Cues are never faster than about one every one and a half seconds, and the same cue is not repeated within four seconds.
+- [ ] In a dark room: "Too dark. Turn on a light." (or, on a phone whose browser allows the flashlight, "It's dark, so I turned on the light." and the flashlight comes on).
+- [ ] A lamp reflecting on glossy paper: "Glare. Tilt the phone a little."
+- [ ] Pressing Capture always takes the picture at once, even while guidance is talking.
+- [ ] Settings, Automatic capture off: the app says "I see the whole page. Press Capture." instead of capturing.
+- [ ] Settings, Guidance minimal: only "Hold still" and the shutter are heard.
+- [ ] "Use phone camera instead" opens the iPhone's camera; after taking the photo and choosing "Use Photo", the app reads it.
+- [ ] Open the app's link from inside another app (for example Gmail or Facebook). If the camera does not start, the app says "Please open this page in Safari." and "Use phone camera instead" still works.
+
 ## 3. Reading controls
 
 - [ ] Pause says "Paused. Paragraph N of M." Play says "Resuming." and repeats the sentence it stopped in.

@@ -54,9 +54,11 @@ test.describe("reading controls", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     await clearUtterances(page);
 
-    await page.getByRole("switch", { name: "Automatic capture" }).click();
-    await expectSpoken(page, "Automatic capture off. Press Capture to take each picture.");
+    // These tests start with automatic capture off, so the switch turns it on.
     await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "false");
+    await page.getByRole("switch", { name: "Automatic capture" }).click();
+    await expectSpoken(page, "Automatic capture on.");
+    await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "true");
 
     await page.getByRole("button", { name: "Minimal guidance" }).click();
     await expectSpoken(page, "Minimal guidance. I'll only say hold still.");
@@ -75,7 +77,7 @@ test.describe("reading controls", () => {
     await page.reload();
     await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
     await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
-    await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Reading speed")).toHaveValue("1.4");
   });
 });

@@ -47,3 +47,22 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - After Spell, the reader stays paused on the spelled sentence so it can be spelled again or played; Play then reads it normally and continues.
 - The reading screen scrolls as a whole page with a sticky control bar, instead of an inner scrolling box. axe flagged the inner box as unreachable by keyboard, and page-level scrolling also works better with VoiceOver's own scrolling.
 - The camera status line may be clipped on short screens so that the Capture button is never pushed off the bottom; everything in it is spoken anyway.
+
+## Phase 3: framing guidance and automatic capture
+
+**Works.**
+- Frame analysis at about seven frames a second on a 160-pixel-wide copy of the preview: brightness, glare (blown-out highlights on paper that is not itself blown out), the page region (largest bright blob after Otsu thresholding and erosion, with a text-detail fallback for a white page on a white table, and a check that a frame-filling bright region is a page held too close rather than a light table), steadiness (frame difference), and sharpness (Laplacian variance, calibrated against the best seen this session).
+- Cue policy: a situation must hold for two frames, at most one cue per 1.5 seconds, no identical cue within 4 seconds, "Hold still" may skip the spacing, and minimal guidance speaks only the hold-still cues. A cue dropped because something else was speaking is not counted as spoken, so it comes back.
+- Automatic capture after 700 ms steady with the whole page in view, sharp, bright enough, and without glare: shutter sound, still capture (`ImageCapture.takePhoto()` when available, otherwise the video frame), a lenient blur check on the still, then "Got it. Reading." A blurry still says "Blurry. Hold still." and re-arms. Automatic capture fires at most once per visit to the camera screen. Manual Capture skips every check.
+- With automatic capture off, a ready page gets "I see the whole page. Press Capture."
+- The flashlight is turned on once in the dark when the browser reports torch support ("It's dark, so I turned on the light."); otherwise "Too dark. Turn on a light."
+- "Use phone camera instead" opens the iPhone camera through a file input; the photo is oriented from its EXIF data and read like any capture. When the live camera fails, it replaces Capture as the big button.
+- Camera failures are told apart: permission denied, another app's in-app browser ("Please open this page in Safari."), insecure address, no camera, camera busy.
+- End-to-end: Chromium's fake camera plays generated videos. The guidance test checks the spoken order "I can't see a page" (empty table), "Move right." (page cut off on the right), "I see the whole page. Hold still." (shaking), then automatic capture once steady, then the page is read. Separate tests cover minimal guidance, automatic capture off, a dark room, the phone-camera fallback, a refused camera, and an in-app browser.
+
+**Changed from the prompt, and why.**
+- Cue wording for a phone held flat over a table. "Move back" and "Move up" or "Move down" are ambiguous when the phone is held flat (back toward you, or up off the table?), so: "Move closer to the page." (too small), "Lift the phone higher." (too close), "Move away from you." and "Move toward you." (cut off at the top or bottom of the phone), and combinations such as "Move right and toward you." Left and right are unchanged.
+- "Too small" triggers below 20 percent of the frame instead of about 40 percent. A fully visible letter-sized page covers only about 40 to 55 percent of a portrait frame, so 40 percent would have asked the user to come so close that the page's edges were cut off.
+- The blur check on the still compares the center of the still with the preview's best center sharpness at the same small size. The still and the preview can have different fields of view (a 4:3 photo and a 16:9 preview), so comparing the page box would not line up.
+
+**Verify on the device.** The thresholds were tuned on synthetic frames and a generated video. The direction cues, hand-tremor tolerance, and flashlight support need the checks in `docs/TESTING-ON-IPHONE.md` section 2a.

@@ -4,23 +4,34 @@ import { installFakeSpeech } from "./fakeSpeech";
 
 export const PASSCODE = "e2e-passcode";
 
-export async function openApp(page: Page, opts: { mode?: "readAloud" | "voiceOver"; passcode?: boolean } = {}) {
+export interface SeedSettings {
+  mode?: "readAloud" | "voiceOver" | null;
+  rate?: number;
+  autoCapture?: boolean;
+  guidance?: "full" | "minimal";
+  sounds?: boolean;
+}
+
+/**
+ * Opens the app with the fake speech engine. `settings` seeds localStorage (only on the first
+ * load, so a reload inside a test keeps what the app saved); `passcode` seeds the passcode.
+ */
+export async function openApp(page: Page, opts: { settings?: SeedSettings; passcode?: boolean } = {}) {
   await page.addInitScript(installFakeSpeech);
-  if (opts.mode || opts.passcode) {
+  if (opts.settings || opts.passcode) {
+    const settings = opts.settings
+      ? { mode: null, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true, ...opts.settings }
+      : null;
     await page.addInitScript(
-      ([mode, passcode]) => {
-        // Seed only once, so a reload inside a test keeps what the app saved.
-        if (mode && !localStorage.getItem("docreader.settings.v1")) {
-          localStorage.setItem(
-            "docreader.settings.v1",
-            JSON.stringify({ mode, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true }),
-          );
+      ([seed, passcode]) => {
+        if (seed && !localStorage.getItem("docreader.settings.v1")) {
+          localStorage.setItem("docreader.settings.v1", JSON.stringify(seed));
         }
         if (passcode && !localStorage.getItem("docreader.passcode.v1")) {
           localStorage.setItem("docreader.passcode.v1", JSON.stringify(passcode));
         }
       },
-      [opts.mode ?? null, opts.passcode ? PASSCODE : null] as const,
+      [settings, opts.passcode ? PASSCODE : null] as const,
     );
   }
   await page.goto("/");
@@ -58,9 +69,12 @@ export async function clearUtterances(page: Page) {
   await page.evaluate(() => ((window as unknown as { __utterances: unknown[] }).__utterances.length = 0));
 }
 
-/** Returning user in the given mode: Start goes straight to the camera. */
-export async function openToCamera(page: Page, mode: "readAloud" | "voiceOver" = "readAloud") {
-  await openApp(page, { mode, passcode: true });
+/**
+ * Returning user in the given mode: Start goes straight to the camera. Automatic capture is off
+ * unless asked for, so tests that press Capture are not racing the camera.
+ */
+export async function openToCamera(page: Page, mode: "readAloud" | "voiceOver" = "readAloud", settings: SeedSettings = {}) {
+  await openApp(page, { settings: { mode, autoCapture: false, ...settings }, passcode: true });
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
 }
@@ -78,4 +92,16 @@ export async function expectNoAxeViolations(page: Page, screen: string) {
     (v) => `${v.id} (${v.impact}): ${v.help}\n    ${v.nodes.map((n) => n.target.join(" ")).join("\n    ")}`,
   );
   expect(summary, `axe violations on the ${screen} screen`).toEqual([]);
+}
+
+/** Launch options that feed Chromium's fake camera from one of the generated videos. */
+export function cameraVideo(name: string) {
+  return {
+    args: [
+      "--use-fake-ui-for-media-stream",
+      "--use-fake-device-for-media-stream",
+      `--use-file-for-fake-video-capture=tests/fixtures/camera/${name}.y4m`,
+      "--autoplay-policy=no-user-gesture-required",
+    ],
+  };
 }
