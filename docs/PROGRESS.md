@@ -28,3 +28,22 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - `FAKE_MODEL=1` swaps in a scripted model for end-to-end tests. It logs a warning at startup and must never be set on a deployment.
 
 **Not yet.** Full reading controls, the full Settings screen, wake lock, keyboard shortcuts, and axe checks (Phase 2); framing guidance, automatic capture, and the phone-camera fallback button (Phase 3); adding pages and questions (Phase 4).
+
+## Phase 2: full playback and accessibility
+
+**Works.**
+- The full read-aloud control bar: Back and Forward (one sentence), Play/Pause, Previous and Next paragraph, Spell, Slower and Faster, New document, Settings. Short visible labels have fuller accessible names that contain the visible text ("Back one sentence").
+- Bluetooth keyboard shortcuts on the reading screen: Space, Left/Right, Up/Down. Space on a focused button is left to the button.
+- Settings: interface mode, voice (the phone's voices for the document language, best first, novelty voices hidden, with Preview), speed slider plus Slower/Faster, automatic capture switch, full or minimal guidance, sounds switch, and Forget passcode. Every change is announced through the one announcement channel. Values persist in `localStorage`.
+- Leaving the reading screen (Settings) pauses silently; coming back resumes with "Resuming." if it was reading, otherwise says the position and "Press Play to continue."
+- Screen Wake Lock is held on the camera and reading screens and re-acquired when the page becomes visible again. Hiding the page (screen lock, app switch) pauses the reader; returning says "Paused. Press Play to continue."
+- Focus moves to each screen's heading on arrival, to the error text after an error, and to the document heading when a page is ready in VoiceOver mode.
+- axe runs on every screen in both modes in the end-to-end tests, with no violations. A layout test checks that the Capture button stays fully visible on small and large iPhone screens.
+- `docs/TESTING-ON-IPHONE.md` is started with the playback, settings, sound, lock-screen, and VoiceOver checks.
+
+**Changed from the prompt, and why.**
+- Paragraph navigation got its own row with full labels ("Previous paragraph", "Next paragraph") instead of five buttons in one row, which forced abbreviations that read badly in VoiceOver.
+- A speed change is announced ("Speed 1.2.") and the current sentence then restarts at the new speed, instead of the new speed starting with the next sentence: announcing the speed already interrupts the sentence, so restarting it is the least surprising behavior.
+- After Spell, the reader stays paused on the spelled sentence so it can be spelled again or played; Play then reads it normally and continues.
+- The reading screen scrolls as a whole page with a sticky control bar, instead of an inner scrolling box. axe flagged the inner box as unreachable by keyboard, and page-level scrolling also works better with VoiceOver's own scrolling.
+- The camera status line may be clipped on short screens so that the Capture button is never pushed off the bottom; everything in it is spoken anyway.

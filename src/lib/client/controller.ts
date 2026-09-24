@@ -19,12 +19,13 @@ import {
   type Mode,
   type Settings,
 } from "./settings";
-import { BrowserSpeechPort, type SpeechPort } from "./speech/port";
+import { BrowserSpeechPort, type SpeechPort, type VoiceInfo } from "./speech/port";
 import { Reader } from "./speech/reader";
 import { Speaker, type Timers } from "./speech/speaker";
-import { pickVoice } from "./speech/voices";
+import { pickVoice, voicesForLanguage } from "./speech/voices";
 import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
+import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
 export type FocusTarget = "heading" | "transcript" | "error";
@@ -62,6 +63,7 @@ export interface ControllerEnv {
   local: StorageLike | null;
   session: StorageLike | null;
   api: ApiClient;
+  wakeLock?: { setWanted(wanted: boolean): void };
 }
 
 export function browserEnv(): ControllerEnv {
@@ -74,6 +76,7 @@ export function browserEnv(): ControllerEnv {
     local: safeStorage("local"),
     session: safeStorage("session"),
     api: createApiClient(),
+    wakeLock: new WakeLockManager(),
   };
 }
 
@@ -90,6 +93,8 @@ export class AppController {
   readonly announcer: Announcer;
   readonly sounds: Sounds;
   readonly session: DocumentSession;
+  /** Voices the phone offers (they load asynchronously on iOS). */
+  readonly voices: Store<VoiceInfo[]>;
 
   private readonly env: ControllerEnv;
   private passcode: string | null;
@@ -143,6 +148,8 @@ export class AppController {
       uiLang: UI_LANG,
     });
     this.session = new DocumentSession({ api: env.api, passcode: () => this.passcode, storage: env.session });
+    this.voices = new Store<VoiceInfo[]>(env.port.getVoices());
+    this.cleanups.push(env.port.onVoicesChanged(() => this.voices.set(env.port.getVoices())));
   }
 
   /** Browser-level listeners. Returns a function that removes them. */
@@ -197,6 +204,8 @@ export class AppController {
   private navigate(screen: Screen): void {
     if (screen !== "camera" && this.ui.get().screen === "camera") this.ui.update({ capturing: false });
     this.ui.update({ screen, errorText: null, focus: { target: "heading", seq: this.ui.get().focus.seq + 1 } });
+    // Keep the screen on while framing a page or listening to one.
+    this.env.wakeLock?.setWanted(screen === "camera" || screen === "reading");
   }
 
   // -------------------------------------------------------------------------
@@ -635,7 +644,62 @@ export class AppController {
     this.speaker.cancelAll();
     this.updateSettings({ mode });
     this.ui.update({ docAppVoice: false });
-    this.say(mode === "voiceOver" ? "VoiceOver mode." : "Read-aloud mode.");
+    this.say(
+      mode === "voiceOver"
+        ? "VoiceOver mode. I'll stay quiet and let VoiceOver speak."
+        : "Read-aloud mode. I'll read everything to you.",
+    );
+  }
+
+  /** The language whose voices Settings lists: the document's, or the interface language. */
+  voiceLanguage(): string {
+    return this.session.doc?.language ?? "en-US";
+  }
+
+  voiceChoices(): VoiceInfo[] {
+    return voicesForLanguage(this.voices.get(), this.voiceLanguage());
+  }
+
+  /** The voice the app will actually use for the current language. */
+  currentVoice(): VoiceInfo | null {
+    return pickVoice(this.voices.get(), this.voiceLanguage(), this.settings.get().voiceURI);
+  }
+
+  setVoice(voiceURI: string | null): void {
+    this.updateSettings({ voiceURI });
+    const voice = this.currentVoice();
+    this.say(voice ? `Voice: ${voice.name}.` : "Voice: automatic.");
+  }
+
+  previewVoice(): void {
+    const lang = this.voiceLanguage();
+    this.speaker.speak(
+      baseLang(lang) === "en" ? "This is how I will read your documents." : "This is how I will read this document.",
+      { priority: "high", lang },
+    );
+  }
+
+  setRate(rate: number): void {
+    const next = clampRate(rate);
+    if (next === this.settings.get().rate) return;
+    this.updateSettings({ rate: next });
+    this.say(`Speed ${next.toFixed(1)}.`);
+  }
+
+  setAutoCapture(on: boolean): void {
+    this.updateSettings({ autoCapture: on });
+    this.say(on ? "Automatic capture on." : "Automatic capture off. Press Capture to take each picture.");
+  }
+
+  setGuidance(guidance: Settings["guidance"]): void {
+    this.updateSettings({ guidance });
+    this.say(guidance === "full" ? "Full guidance." : "Minimal guidance. I'll only say hold still.");
+  }
+
+  setSounds(on: boolean): void {
+    this.updateSettings({ sounds: on });
+    this.say(on ? "Sounds on." : "Sounds off.");
+    if (on) this.sounds.tick();
   }
 
   // -------------------------------------------------------------------------
@@ -662,6 +726,10 @@ export class AppController {
       void this.attachVideo(this.videoEl);
     }
   }
+}
+
+function baseLang(tag: string): string {
+  return tag.toLowerCase().split(/[-_]/)[0] ?? tag;
 }
 
 function liveTitleAnnouncement(page: DocPage, meta: MetaEvent): string {

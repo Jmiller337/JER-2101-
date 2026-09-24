@@ -41,10 +41,15 @@ export function CameraScreen() {
         className="absolute inset-0 h-full w-full object-cover"
       />
       <div className="relative z-10 flex h-full flex-col gap-3 p-4">
-        <h1 ref={headingRef} tabIndex={-1} className="self-start rounded-xl bg-black/80 px-3 py-1 text-3xl font-bold">
+        <h1 ref={headingRef} tabIndex={-1} className="shrink-0 self-start rounded-xl bg-black/80 px-3 py-1 text-3xl font-bold">
           {heading}
         </h1>
-        <p className="rounded-xl bg-black/80 px-3 py-2 text-3xl font-bold leading-snug" data-testid="camera-status">
+        {/* The status line may be clipped on a short screen; it is spoken anyway, and the
+            Capture button must never be pushed off the bottom. */}
+        <p
+          className="min-h-0 shrink overflow-hidden rounded-xl bg-black/80 px-3 py-2 text-2xl font-bold leading-snug"
+          data-testid="camera-status"
+        >
           {ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage}
         </p>
         {ui.errorText && (
@@ -52,7 +57,7 @@ export function CameraScreen() {
             {ui.errorText}
           </p>
         )}
-        <div className="mt-auto flex flex-col gap-3">
+        <div className="mt-auto flex shrink-0 flex-col gap-3">
           <div className="flex flex-wrap gap-3">
             {docInProgress && <Button label="Back to reading" onClick={() => controller.backToReading()} />}
             <Button label="Settings" onClick={() => controller.openSettings()} />
@@ -61,7 +66,7 @@ export function CameraScreen() {
             type="button"
             onClick={() => void controller.captureManual()}
             aria-disabled={ui.capturing}
-            className="h-[33dvh] min-h-32 w-full rounded-3xl border-4 border-yellow-300 bg-yellow-300 text-5xl font-extrabold text-black"
+            className="h-[33dvh] min-h-28 w-full rounded-3xl border-4 border-yellow-300 bg-yellow-300 text-5xl font-extrabold text-black"
           >
             {ui.capturing ? "Capturing…" : "Capture"}
           </button>

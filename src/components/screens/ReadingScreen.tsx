@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
+import { ReaderControls } from "../ReaderControls";
 import { Transcript } from "../Transcript";
 import { Button } from "../ui";
 
@@ -26,11 +27,10 @@ export function ReadingScreen() {
   const doc = session.doc;
   const waitingFor = session.awaitingPage;
   const title = doc?.title || (waitingFor ? `Reading page ${waitingFor}…` : "Reading");
-  const playing = reader.status === "playing" || reader.status === "waiting" || reader.status === "spelling";
 
   return (
-    <main className="flex h-dvh flex-col bg-black text-white">
-      <div className="flex-1 overflow-y-auto px-5 pb-8 pt-5">
+    <main className="flex min-h-dvh flex-col bg-black text-white">
+      <div className="flex-1 px-5 pb-8 pt-5">
         <h1 ref={headingRef} tabIndex={-1} className="mb-5 text-3xl font-bold leading-tight">
           {title}
         </h1>
@@ -58,22 +58,7 @@ export function ReadingScreen() {
           </div>
         )}
       </div>
-      {appVoice && (
-        <nav aria-label="Reading controls" className="border-t-2 border-neutral-700 bg-neutral-950 p-3">
-          <div className="grid grid-cols-1 gap-3">
-            <Button
-              label={playing ? "Pause" : "Play"}
-              variant="primary"
-              size="huge"
-              onClick={() => controller.togglePlay()}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Button label="New document" size="normal" onClick={() => controller.newDocument()} />
-              <Button label="Settings" size="normal" onClick={() => controller.openSettings()} />
-            </div>
-          </div>
-        </nav>
-      )}
+      {appVoice && <ReaderControls />}
     </main>
   );
 }
