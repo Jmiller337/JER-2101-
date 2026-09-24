@@ -53,12 +53,23 @@ export function ReadingScreen() {
               onClick={() => controller.playWithAppVoice()}
               aria-disabled={!doc}
             />
+            <Button label="Ask a question" onClick={() => controller.openAsk()} aria-disabled={!doc} />
+            <Button label="Add page" onClick={() => controller.addPage()} aria-disabled={!doc} />
             <Button label="New document" onClick={() => controller.newDocument()} />
             <Button label="Settings" onClick={() => controller.openSettings()} />
           </div>
         )}
       </div>
-      {appVoice && <ReaderControls />}
+      {appVoice && (
+        <ReaderControls
+          extra={
+            <>
+              <Button label="Ask a question" size="normal" onClick={() => controller.openAsk()} aria-disabled={!doc} />
+              <Button label="Add page" size="normal" onClick={() => controller.addPage()} aria-disabled={!doc} />
+            </>
+          }
+        />
+      )}
     </main>
   );
 }

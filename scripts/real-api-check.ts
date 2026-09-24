@@ -1,16 +1,20 @@
 /**
  * Sends a page photo to the real Anthropic API through the read route handler and prints every
  * event with its arrival time, the time to the first block, token usage, and an estimated cost.
+ * Then asks two questions about the page through the ask handler; the second should read the
+ * transcript from the prompt cache (if the page is long enough to be cached).
  *
  *   ANTHROPIC_API_KEY=... npm run check:real-api [path/to/photo.jpg]
  *
- * Costs a few cents per run. Uses READ_MODEL if set, otherwise the default model.
+ * Costs a few cents per run. Uses READ_MODEL and ASK_MODEL if set, otherwise the default model.
  */
 import { readFileSync } from "node:fs";
 import { createAnthropicModelClient } from "../src/lib/server/anthropic";
+import { createFakeModelClient } from "../src/lib/server/fakeModel";
 import { serverEnv } from "../src/lib/server/config";
 import type { HandlerDeps } from "../src/lib/server/deps";
 import type { RequestLog } from "../src/lib/server/log";
+import { handleAsk } from "../src/lib/server/askHandler";
 import { handleRead } from "../src/lib/server/readHandler";
 
 const PRICES: Record<string, { input: number; output: number }> = {
@@ -19,8 +23,10 @@ const PRICES: Record<string, { input: number; output: number }> = {
 };
 
 async function main(): Promise<void> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const dryRun = process.env.FAKE_MODEL === "1";
+  if (!dryRun && !process.env.ANTHROPIC_API_KEY) {
     console.error("Set ANTHROPIC_API_KEY first. This check calls the real API and costs a few cents.");
+    console.error("(FAKE_MODEL=1 runs the same script against the scripted test model, for free.)");
     process.exit(2);
   }
   const file = process.argv[2] ?? "tests/fixtures/pages/letter-photo.jpg";
@@ -28,7 +34,8 @@ async function main(): Promise<void> {
   const mediaType = file.endsWith(".png") ? "image/png" : file.endsWith(".webp") ? "image/webp" : "image/jpeg";
   const logs: RequestLog[] = [];
   const env = { ...serverEnv(), passcode: "local-check" };
-  const client = createAnthropicModelClient();
+  const client = dryRun ? createFakeModelClient() : createAnthropicModelClient();
+  if (dryRun) console.log("Dry run with the scripted test model (FAKE_MODEL=1); no API calls are made.");
   const deps: HandlerDeps = { env, modelConfigured: true, client: () => client, log: (entry) => logs.push(entry), now: Date.now };
 
   const request = new Request("http://localhost/api/read", {
@@ -49,6 +56,8 @@ async function main(): Promise<void> {
   let buffer = "";
   let firstMeta: number | null = null;
   let firstBlock: number | null = null;
+  let title = "";
+  const blocks: string[] = [];
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -59,8 +68,14 @@ async function main(): Promise<void> {
       if (!line.trim()) continue;
       const ms = Date.now() - started;
       const event = JSON.parse(line) as { type: string; text?: string; title?: string; status?: string };
-      if (event.type === "meta") firstMeta ??= ms;
-      if (event.type === "block") firstBlock ??= ms;
+      if (event.type === "meta") {
+        firstMeta ??= ms;
+        title = event.title ?? "";
+      }
+      if (event.type === "block") {
+        firstBlock ??= ms;
+        blocks.push(event.text ?? "");
+      }
       const detail = event.type === "block" ? event.text : event.type === "meta" ? `${event.status}: ${event.title}` : line;
       console.log(`${String(ms).padStart(6)} ms  ${event.type.padEnd(5)}  ${detail}`);
     }
@@ -74,6 +89,34 @@ async function main(): Promise<void> {
     const price = PRICES[env.readModel] ?? PRICES["claude-opus-5-5"]!;
     const cost = (log.inputTokens * price.input + (log.outputTokens ?? 0) * price.output) / 1_000_000;
     console.log(`  tokens: ${log.inputTokens} in, ${log.outputTokens} out; about $${cost.toFixed(4)}`);
+  }
+
+  if (blocks.length === 0) return;
+  const history: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const question of ["How much do I owe, and when is it due?", "What phone number can I call?"]) {
+    const askLogs: RequestLog[] = [];
+    const askDeps: HandlerDeps = { ...deps, log: (entry) => askLogs.push(entry) };
+    const askStarted = Date.now();
+    const askRes = await handleAsk(
+      new Request("http://localhost/api/ask", {
+        method: "POST",
+        headers: { authorization: "Bearer local-check", "content-type": "application/json" },
+        body: JSON.stringify({ pages: [blocks.join("\n")], title, history, question }),
+      }),
+      askDeps,
+    );
+    const text = (await askRes.text())
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; text?: string; message?: string })
+      .map((event) => (event.type === "text" ? event.text : event.type === "error" ? `[error] ${event.message}` : ""))
+      .join("");
+    const askLog = askLogs[0];
+    console.log(`\nQ: ${question}\nA: ${text}`);
+    console.log(
+      `  ${Date.now() - askStarted} ms; first text at ${askLog?.firstEventMs} ms; tokens ${askLog?.inputTokens} in (cache read ${askLog?.cacheReadTokens}, cache write ${askLog?.cacheWriteTokens}), ${askLog?.outputTokens} out`,
+    );
+    history.push({ role: "user", content: question }, { role: "assistant", content: text });
   }
 }
 

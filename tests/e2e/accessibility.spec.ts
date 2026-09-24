@@ -28,6 +28,16 @@ test("the reading screen passes axe in VoiceOver mode", async ({ page }) => {
   await expectNoAxeViolations(page, "reading (VoiceOver mode)");
 });
 
+test("the Ask screen passes axe with an answer on screen", async ({ page }) => {
+  await openToCamera(page);
+  await captureAndRead(page);
+  await page.getByRole("button", { name: "Ask a question" }).click();
+  await page.getByRole("textbox", { name: "Your question" }).fill("How much do I owe?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByTestId("answers")).toContainText("You owe 84 dollars");
+  await expectNoAxeViolations(page, "ask");
+});
+
 test("each screen has exactly one h1", async ({ page }) => {
   await openToCamera(page);
   await expect(page.locator("h1")).toHaveCount(1);

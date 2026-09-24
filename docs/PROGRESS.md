@@ -66,3 +66,18 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - The blur check on the still compares the center of the still with the preview's best center sharpness at the same small size. The still and the preview can have different fields of view (a 4:3 photo and a 16:9 preview), so comparing the page box would not line up.
 
 **Verify on the device.** The thresholds were tuned on synthetic frames and a generated video. The direction cues, hand-tremor tolerance, and flashlight support need the checks in `docs/TESTING-ON-IPHONE.md` section 2a.
+
+## Phase 4: several pages and questions
+
+**Works.**
+- Add page (read-aloud control bar and VoiceOver-mode buttons): the camera opens as "Add page N" with its own short instruction; the new page is read into the same document. If reading had finished, the app says "Page N added." and reads the new page; if it was mid-page, it goes back to where it was and says "Page N." at the boundary. Pages stay in order even if a late block for an earlier page arrives. A retry does not use up the page number, and pressing Add page before the previous page's first line has arrived says "Wait a moment, I'm still reading the last page."
+- The document (text only) is kept in `sessionStorage`; after an accidental reload, Start restores it and says "Your document is still here: …".
+- `/api/ask` streams an answer about all pages with the transcript in a cached system block and the last ten turns of history. The phone speaks the answer sentence by sentence as it arrives (read-aloud mode) or announces it in one live-region message when complete (VoiceOver mode), then "Ask another question, or press Back to reading." Questions and answers stay on screen as a list.
+- Talk uses the browser's speech recognition where it exists; the recognized words appear in the question box as they are heard, and the app confirms "You asked: …" before answering. Where recognition is missing or refused, the app says so and the text box (with the keyboard's dictation key) remains the way in.
+- `npm run check:real-api` now also asks two questions about the page it read and prints the cache tokens, so the owner can confirm the prompt cache works on a long document. `FAKE_MODEL=1` runs the script against the scripted model for free.
+
+**Changed from the prompt, and why.**
+- "Hold to talk" became a Talk toggle: tap to start, tap "Stop and send" to finish. Holding a button down is awkward with VoiceOver (double-tap and hold), and a toggle works the same for everyone.
+- `/api/ask` streams NDJSON (`text`, `done`, `error` events) rather than plain text, so a failure part-way through an answer can be announced properly.
+- New document asks for a second press within six seconds when there is a document, so one stray tap cannot throw a document away.
+- A spoken question is echoed ("You asked: …") before the answer, so recognition mistakes are caught.

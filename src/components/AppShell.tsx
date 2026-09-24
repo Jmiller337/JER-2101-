@@ -2,6 +2,7 @@
 
 import { useController, useStore } from "./hooks";
 import { LiveRegions } from "./LiveRegions";
+import { AskScreen } from "./screens/AskScreen";
 import { CameraScreen } from "./screens/CameraScreen";
 import { ModeScreen } from "./screens/ModeScreen";
 import { PasscodeScreen } from "./screens/PasscodeScreen";
@@ -20,6 +21,7 @@ export function AppShell() {
       {screen === "passcode" && <PasscodeScreen />}
       {screen === "camera" && <CameraScreen />}
       {screen === "reading" && <ReadingScreen />}
+      {screen === "ask" && <AskScreen />}
       {screen === "settings" && <SettingsScreen />}
     </>
   );

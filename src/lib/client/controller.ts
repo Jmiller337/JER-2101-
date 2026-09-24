@@ -1,5 +1,5 @@
 import { CAMERA_MESSAGES, spokenError } from "@/lib/shared/messages";
-import type { ErrorCode, MetaEvent } from "@/lib/shared/protocol";
+import type { ChatTurn, ErrorCode, MetaEvent } from "@/lib/shared/protocol";
 import { Announcer, type AnnounceOptions, type Channel } from "./announce/announcer";
 import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
@@ -7,7 +7,7 @@ import { Sounds } from "./audio/sounds";
 import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
 import { FrameSampler } from "./camera/frameSampler";
 import { imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
-import type { Doc, DocPage } from "./document/model";
+import { docToAskPages, type Doc, type DocPage } from "./document/model";
 import { DocumentSession } from "./document/session";
 import {
   clampRate,
@@ -21,6 +21,8 @@ import {
   type Settings,
 } from "./settings";
 import { BrowserSpeechPort, type SpeechPort, type VoiceInfo } from "./speech/port";
+import { Listener, recognitionAvailable } from "./speech/recognition";
+import { StreamingSpeech } from "./speech/streamingSpeech";
 import { Reader } from "./speech/reader";
 import { Speaker, type Timers } from "./speech/speaker";
 import { pickVoice, voicesForLanguage } from "./speech/voices";
@@ -51,7 +53,26 @@ export interface UiState {
   focus: { target: FocusTarget; seq: number };
 }
 
+export interface AskTurn {
+  id: number;
+  question: string;
+  answer: string;
+  status: "streaming" | "done" | "error";
+  error?: string;
+}
+
+export interface AskState {
+  turns: AskTurn[];
+  busy: boolean;
+  listening: boolean;
+  /** Text recognized so far while listening (shown in the question field). */
+  heard: string;
+  recognitionAvailable: boolean;
+}
+
 export const UI_LANG = "en";
+export const ASK_INTRO = "Ask your question, then press Send. Or press Talk and say it.";
+export const ASK_AGAIN = "Ask another question, or press Back to reading.";
 
 export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
@@ -99,6 +120,7 @@ export class AppController {
   readonly session: DocumentSession;
   /** Voices the phone offers (they load asynchronously on iOS). */
   readonly voices: Store<VoiceInfo[]>;
+  readonly ask: Store<AskState>;
 
   private readonly env: ControllerEnv;
   private passcode: string | null;
@@ -118,6 +140,11 @@ export class AppController {
   private armed = false;
   private torchTried = false;
   private readonly cleanups: Array<() => void> = [];
+  private answerSpeech: StreamingSpeech | null = null;
+  private askAbort: AbortController | null = null;
+  private readonly listener = new Listener();
+  private nextTurnId = 1;
+  private newDocumentArmedUntil = 0;
 
   constructor(env: ControllerEnv = browserEnv()) {
     this.env = env;
@@ -160,6 +187,13 @@ export class AppController {
     });
     this.session = new DocumentSession({ api: env.api, passcode: () => this.passcode, storage: env.session });
     this.voices = new Store<VoiceInfo[]>(env.port.getVoices());
+    this.ask = new Store<AskState>({
+      turns: [],
+      busy: false,
+      listening: false,
+      heard: "",
+      recognitionAvailable: typeof window !== "undefined" && recognitionAvailable(),
+    });
     this.cleanups.push(env.port.onVoicesChanged(() => this.voices.set(env.port.getVoices())));
   }
 
@@ -687,7 +721,22 @@ export class AppController {
     this.reader.play();
   }
 
+  /**
+   * Clears the document. When there is one, the first press only explains; a second press within
+   * six seconds clears it, so a stray tap never throws a document away.
+   */
   newDocument(): void {
+    const hasDoc = (this.session.doc?.pages.length ?? 0) > 0;
+    const now = this.now();
+    if (hasDoc && now > this.newDocumentArmedUntil) {
+      this.newDocumentArmedUntil = now + 6000;
+      this.reader.suspend();
+      this.say("Press New document again to clear this document and start a new one.");
+      return;
+    }
+    this.newDocumentArmedUntil = 0;
+    this.stopAnswer();
+    this.ask.update({ turns: [], busy: false });
     this.reader.reset();
     this.session.newDocument();
     this.stopLoadingTicker();
@@ -722,6 +771,167 @@ export class AppController {
     }
     if (resume) this.reader.resume();
     else this.say(`${this.reader.positionReport("Paused")} Press Play to continue.`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Questions (PROMPT.md screen 3 and 6.6)
+  // -------------------------------------------------------------------------
+
+  openAsk(): void {
+    if (!this.session.doc?.pages.length) {
+      this.say("Read a page first, then you can ask about it.");
+      return;
+    }
+    const from = this.ui.get().screen;
+    this.resumeOnReturn = from === "reading" ? this.reader.suspend() : false;
+    this.ui.update({ returnTo: "reading" });
+    this.navigate("ask");
+    this.say(ASK_INTRO);
+  }
+
+  closeAsk(): void {
+    this.stopListening(true);
+    this.stopAnswer();
+    this.askAbort?.abort();
+    this.askAbort = null;
+    this.ask.update({ busy: false });
+    this.navigate("reading");
+    this.afterReturnToReading();
+  }
+
+  /** Stops the answer being spoken (it stays on screen). */
+  private stopAnswer(): void {
+    this.answerSpeech?.stop();
+    this.answerSpeech = null;
+  }
+
+  async submitQuestion(input: string, opts: { spoken?: boolean } = {}): Promise<void> {
+    const question = input.trim();
+    const doc = this.session.doc;
+    if (!question) {
+      this.say("Type or say a question first.");
+      return;
+    }
+    if (!doc || this.ask.get().busy) return;
+    const passcode = this.passcode;
+    if (!passcode) {
+      this.navigate("passcode");
+      this.fail("The passcode was not accepted. Please enter it again.");
+      return;
+    }
+    this.stopAnswer();
+    const previous = this.ask.get().turns.filter((t) => t.status === "done");
+    const turn: AskTurn = { id: this.nextTurnId++, question, answer: "", status: "streaming" };
+    this.ask.update({ turns: [...this.ask.get().turns, turn], busy: true, heard: "" });
+    const update = (patch: Partial<AskTurn>) => {
+      Object.assign(turn, patch);
+      this.ask.update({ turns: [...this.ask.get().turns] });
+    };
+    if (opts.spoken) this.say(`You asked: ${question}`);
+
+    const speech = this.appVoiceActive
+      ? new StreamingSpeech(this.speaker, {
+          lang: UI_LANG,
+          rate: () => this.settings.get().rate,
+          onDone: () => this.say(ASK_AGAIN),
+        })
+      : null;
+    this.answerSpeech = speech;
+    const history: ChatTurn[] = previous.flatMap((t) => [
+      { role: "user" as const, content: t.question },
+      { role: "assistant" as const, content: t.answer },
+    ]);
+    const abort = new AbortController();
+    this.askAbort = abort;
+    this.startLoadingTicker();
+    try {
+      await this.env.api.ask(
+        { pages: docToAskPages(doc), title: doc.title, history, question },
+        passcode,
+        (event) => {
+          if (abort.signal.aborted) return;
+          if (event.type === "text") {
+            this.stopLoadingTicker();
+            update({ answer: turn.answer + event.text });
+            speech?.push(event.text);
+          } else if (event.type === "done") {
+            update({ status: "done" });
+            if (speech) speech.finish();
+            else this.say(`Answer: ${turn.answer.trim()} ${ASK_AGAIN}`);
+          } else {
+            update({ status: "error", error: event.message });
+            speech?.stop();
+            this.fail(event.message);
+          }
+        },
+        abort.signal,
+      );
+    } catch (err) {
+      if (abort.signal.aborted) return;
+      const code: ErrorCode = err instanceof ApiError ? err.code : "network";
+      speech?.stop();
+      update({ status: "error", error: spokenError(code, "ask") });
+      if (code === "unauthorized") {
+        this.passcode = null;
+        forgetPasscode(this.env.local);
+        this.navigate("passcode");
+      }
+      this.fail(spokenError(code, "ask"));
+    } finally {
+      this.stopLoadingTicker();
+      if (this.askAbort === abort) this.askAbort = null;
+      this.ask.update({ busy: false });
+    }
+  }
+
+  /** The Talk button: starts listening, or stops and sends what was heard. */
+  toggleListening(): void {
+    if (this.ask.get().listening) {
+      this.stopListening(false);
+      return;
+    }
+    if (!recognitionAvailable()) {
+      this.say("Speaking a question isn't available here. Type it instead; the keyboard's microphone key also works.");
+      return;
+    }
+    // The app must not talk while the microphone is listening.
+    this.stopAnswer();
+    this.speaker.cancelAll();
+    const started = this.listener.start(this.voiceLanguage().startsWith("en") ? "en-US" : this.voiceLanguage(), {
+      onText: (text) => this.ask.update({ heard: text }),
+      onEnd: (text, error) => {
+        this.ask.update({ listening: false });
+        if (this.discardListening) {
+          this.discardListening = false;
+          return;
+        }
+        if (text) {
+          void this.submitQuestion(text, { spoken: true });
+          return;
+        }
+        if (error === "not-allowed" || error === "service-not-allowed") {
+          this.say("I can't use the microphone. Type your question instead.");
+        } else {
+          this.say("I didn't hear a question. Press Talk and try again, or type it.");
+        }
+      },
+    });
+    if (!started) {
+      this.say("I couldn't start listening. Type your question instead.");
+      return;
+    }
+    this.ask.update({ listening: true, heard: "" });
+    this.sounds.tick();
+  }
+
+  private discardListening = false;
+
+  private stopListening(discard: boolean): void {
+    if (!this.listener.active) return;
+    this.discardListening = discard;
+    if (discard) this.listener.abort();
+    else this.listener.stop();
+    this.ask.update({ listening: false });
   }
 
   // -------------------------------------------------------------------------

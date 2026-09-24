@@ -51,6 +51,24 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Slower and Faster say the new speed ("Speed 1.1.") and continue at that speed.
 - [ ] With a Bluetooth keyboard: Space pauses and plays, the arrow keys move by sentence and paragraph.
 
+## 3a. Several pages
+
+- [ ] After page 1 has finished, press Add page. The camera screen says "Add page 2" and the app says "Page 2. Lay the phone flat on the next page…". After the capture it says "Page 2 added." and reads page 2.
+- [ ] Start a new two-page letter. Press Add page while page 1 is still being read, capture page 2, and check that the app goes back to where it was on page 1, then says "Page 2." at the boundary and reads on.
+- [ ] Pause shows the page: "Paused. Paragraph 2 of 5, page 2 of 2."
+- [ ] Reload the page in Safari (or close and reopen the tab): after Start, the app says "Your document is still here…" and Play reads it.
+- [ ] New document asks for a second press ("Press New document again to clear this document…") and only then clears it.
+
+## 3b. Questions
+
+- [ ] Ask a question: the app says "Ask your question, then press Send. Or press Talk and say it."
+- [ ] Type "When is it due?" and press Send. The answer is spoken as it arrives, then "Ask another question, or press Back to reading."
+- [ ] Press Talk, say a question, press "Stop and send". The app says "You asked: …" and answers. (If Talk says speech input is not available, use the keyboard's microphone key in the question box instead.)
+- [ ] Ask something the document does not say ("What is my account password?"). The answer says it is not in the document.
+- [ ] Ask a follow-up that depends on the previous answer ("And how can I pay it?"). The answer makes sense.
+- [ ] In VoiceOver mode the answer is read by VoiceOver, not by the app voice.
+- [ ] Back to reading continues reading if it was reading before.
+
 ## 4. Settings
 
 - [ ] Settings pauses reading. Each change is spoken ("Speed 1.3.", "Automatic capture off…", "Sounds off.").

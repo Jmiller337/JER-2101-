@@ -46,7 +46,7 @@ export function ReaderControls({ extra }: { extra?: React.ReactNode }) {
           onClick={() => controller.faster()}
         />
       </div>
-      <div className="mt-2 flex flex-wrap gap-2 [&>*]:flex-1">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         {extra}
         <Button label="New document" size="normal" onClick={() => controller.newDocument()} />
         <Button label="Settings" size="normal" onClick={() => controller.openSettings()} />
