@@ -90,6 +90,7 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - Bundle size: the phone downloads 155 KB of JavaScript (gzipped, 524 KB raw). It was 244 KB until `zod` was removed from the phone's code: the shared protocol now uses small hand-written validators, and `zod` validates request bodies on the server only. An end-to-end test fails if the JavaScript grows past 200 KB gzipped.
 - `Dockerfile` (multi-stage, standalone output, non-root user, health check), `.dockerignore`, and `fly.toml` (HTTPS forced, auto stop and start, health check on `/api/health`, 512 MB machine). The image was built and run locally: it serves the app and icons, answers the health check, and streams a page read line by line. It is about 330 MB.
 - Returning to a visible page on the camera screen restarts a paused preview (iOS can pause it while the phone is locked).
+- Each page keeps the JPEG it was read from in memory for the session (PROMPT.md 6.4 and 6.9), for a future re-read or questions about the image. It is never written to `sessionStorage`.
 - `docs/SETUP.md` (Vercel, Fly.io, optional `.dev` domain, iPhone setup, first use, model and cost, privacy, troubleshooting), the finished `docs/TESTING-ON-IPHONE.md`, and a new `README.md`.
 
 **Notes.**

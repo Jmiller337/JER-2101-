@@ -16,6 +16,11 @@ export interface DocPage {
   complete: boolean;
   /** The read stopped early (an error after some text arrived). */
   failed?: boolean;
+  /**
+   * The photo this page was read from, kept in memory for the session so a later version can
+   * re-read the page or answer questions about the image (PROMPT.md 6.4 and 6.9). Never stored.
+   */
+  image?: Blob;
 }
 
 export interface Doc {
@@ -90,7 +95,14 @@ export function docToAskPages(doc: Doc): string[] {
 
 /** Saves the document (text only, never images) so an accidental reload does not lose it. */
 export function saveDoc(storage: StorageLike | null, doc: Doc): void {
-  writeJson(storage, DOC_KEY, doc);
+  writeJson(storage, DOC_KEY, {
+    ...doc,
+    pages: doc.pages.map((page) => {
+      const copy: DocPage = { ...page };
+      delete copy.image;
+      return copy;
+    }),
+  });
 }
 
 export function loadDoc(storage: StorageLike | null): Doc | null {

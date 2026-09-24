@@ -6,7 +6,14 @@ import { DocumentSession, type PageReadCallbacks } from "@/lib/client/document/s
 import { MemoryStorage } from "@/lib/client/storage";
 import type { ReadEvent } from "@/lib/shared/protocol";
 
-const IMAGE: PreparedImage = { base64: "AAAA", mediaType: "image/jpeg", width: 10, height: 10, bytes: 3 };
+const IMAGE: PreparedImage = {
+  base64: "AAAA",
+  mediaType: "image/jpeg",
+  width: 10,
+  height: 10,
+  bytes: 3,
+  blob: new Blob(["jpeg"], { type: "image/jpeg" }),
+};
 
 function api(events: ReadEvent[], opts: { throwAfter?: ApiError } = {}): ApiClient & { requests: unknown[] } {
   const requests: unknown[] = [];
@@ -48,6 +55,9 @@ describe("DocumentSession", () => {
     expect(session.nextPageNumber).toBe(2);
     expect(loadDoc(storage)?.pages[0]?.blocks).toEqual([{ kind: "paragraph", text: "Hello." }]);
     expect(session.isReading).toBe(false);
+    // The photo stays in memory with the page but is never written to storage.
+    expect(session.doc?.pages[0]?.image).toBeInstanceOf(Blob);
+    expect(storage.getItem("docreader.document.v1")).not.toContain("image");
   });
 
   it("does not use up the page number when the photo must be retaken", async () => {

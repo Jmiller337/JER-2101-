@@ -4,6 +4,8 @@ export interface PreparedImage {
   width: number;
   height: number;
   bytes: number;
+  /** The JPEG itself, kept in memory with the page (never stored). */
+  blob?: Blob;
 }
 
 export const MAX_LONG_EDGE = 2000;
@@ -37,7 +39,7 @@ export async function prepareImage(source: CanvasImageSource, width: number, hei
   // Release the canvas memory promptly; iOS limits total canvas memory.
   canvas.width = 0;
   canvas.height = 0;
-  return { base64, mediaType: "image/jpeg", width: size.width, height: size.height, bytes: blob.size };
+  return { base64, mediaType: "image/jpeg", width: size.width, height: size.height, bytes: blob.size, blob };
 }
 
 export async function blobToBase64(blob: Blob): Promise<string> {

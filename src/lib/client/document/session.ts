@@ -114,6 +114,7 @@ export class DocumentSession {
                 ...(event.warning ? { warning: event.warning } : {}),
                 blocks: [],
                 complete: false,
+                ...(image.blob ? { image: image.blob } : {}),
               };
               this.addPage(page);
               cb.onPageStart(page, event);
