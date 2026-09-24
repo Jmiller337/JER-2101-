@@ -1,0 +1,14 @@
+.git
+node_modules
+.next
+.env
+.env.*
+!.env.example
+certificates
+coverage
+playwright-report
+test-results
+blob-report
+tests/fixtures/camera
+*.log
+.DS_Store

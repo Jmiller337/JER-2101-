@@ -1,15 +1,39 @@
-# Document reader for a blind iPhone user
+# Document Reader
 
-A mobile web app that lets a blind person read paper documents with their iPhone: hold the phone over the page, get spoken guidance until the page is in view, the app takes the photo, Claude reads it, and the phone reads it aloud with playback controls. Multi-page documents and questions about the document are supported.
+A mobile web app that lets a blind person read paper documents with an iPhone. Hold the phone over a page and the app guides you by voice ("Move left", "Hold still") until the whole page is in view, takes the photo itself, sends it to Claude to read, and reads the text aloud with playback controls. You can add more pages and ask questions about the document ("When is it due?").
 
-## Status
+It works with or without VoiceOver: in read-aloud mode the app speaks everything itself; in VoiceOver mode it stays quiet and VoiceOver reads a properly structured page.
 
-The app has not been built yet. This repository currently holds the build specification.
+## Documentation
 
-- `PROMPT.md` is the complete build prompt, written for Claude Code. Open Claude Code in a checkout of this repository and paste the contents of that file (everything below its horizontal rule) as the first message. It contains every product decision, the spoken scripts, the API protocol, the Claude API configuration, hosting for Vercel and Fly.io, a phased build plan, and the testing and handover requirements.
+| Document | For |
+|---|---|
+| [`docs/SETUP.md`](docs/SETUP.md) | Deploying (Vercel or Fly.io), setting up the iPhone, first use, costs, privacy, troubleshooting |
+| [`docs/TESTING-ON-IPHONE.md`](docs/TESTING-ON-IPHONE.md) | The manual checklist to run on the real iPhone after each deploy |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | What was built in each phase, what changed from the spec and why, and what still needs the owner |
+| [`PROMPT.md`](PROMPT.md) | The full product specification the app was built from |
+| [`CLAUDE.md`](CLAUDE.md) | Conventions and commands for anyone (or any AI assistant) changing the code |
+| [`docs/PLAN.md`](docs/PLAN.md) | The module breakdown |
 
-## What you need before the build starts
+## Quick start for developers
 
-- An Anthropic API key (console.anthropic.com).
-- A place to deploy over HTTPS: a Vercel account (default) or a Fly.io account (alternative). The prompt asks the builder to produce a step-by-step setup guide for whichever you choose.
-- An iPhone with Safari for the manual tests at the end; nothing in CI can run iOS Safari with a real camera and VoiceOver.
+Requires Node.js 22.
+
+```
+npm install
+cp .env.example .env.local   # then fill in ANTHROPIC_API_KEY and APP_PASSCODE
+npm run dev                  # http://localhost:3000
+```
+
+The camera needs a secure connection, so to try it from a phone on the same network run `npm run dev:https` and open the `https://` address it prints.
+
+| Command | What it does |
+|---|---|
+| `npm run lint`, `npm run typecheck`, `npm test` | Lint, types, unit and route tests |
+| `npm run test:e2e` | Builds and runs Playwright tests against the production server with a fake camera, a fake speech engine, and a scripted model (no API key needed) |
+| `npm run check:real-api` | Reads the test photo with the real API and prints timings and cost (needs `ANTHROPIC_API_KEY`) |
+
+## How it works
+
+- **Phone (Next.js, React, TypeScript):** camera and frame analysis in the browser, a speech engine built on the phone's own voices (`speechSynthesis`), and a single announcement channel that goes either to speech or to VoiceOver's live region.
+- **Server (Next.js route handlers):** `/api/read` sends one photo to Claude (`claude-opus-5-5`) and streams the page back line by line so reading starts before the page is finished; `/api/ask` answers questions about the pages. The API key stays on the server; a passcode protects both routes.

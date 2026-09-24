@@ -1,6 +1,7 @@
 import { toNdjsonLine } from "@/lib/shared/ndjson";
 import { spokenError } from "@/lib/shared/messages";
-import { ReadRequestSchema, type ReadEvent, type ReadRequest } from "@/lib/shared/protocol";
+import type { ReadEvent, ReadRequest } from "@/lib/shared/protocol";
+import { ReadRequestSchema } from "./schemas";
 import { FALLBACK_BETA, type ModelMessage, type StreamParams } from "./anthropic";
 import { checkRequest } from "./auth";
 import { readJsonBody } from "./body";

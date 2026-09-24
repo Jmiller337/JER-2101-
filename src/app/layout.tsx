@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Document Reader",
   description: "Reads paper documents aloud.",
+  applicationName: "Document Reader",
+  // The home-screen name on iOS. No `capable`: the icon should open in Safari, not standalone.
+  appleWebApp: { title: "Reader" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {

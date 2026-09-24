@@ -51,6 +51,8 @@ export interface UiState {
   addingPage: number | null;
   /** Screens move focus when this changes. */
   focus: { target: FocusTarget; seq: number };
+  /** The browser has no speech engine: everything goes to the live region and a banner shows. */
+  speechUnavailable: boolean;
 }
 
 export interface AskTurn {
@@ -162,6 +164,7 @@ export class AppController {
       docAppVoice: false,
       addingPage: null,
       focus: { target: "heading", seq: 0 },
+      speechUnavailable: false,
     });
     this.speaker = new Speaker({
       port: env.port,
@@ -224,6 +227,7 @@ export class AppController {
 
   /** Principle 1: announcements go to the app voice or to the live region, never both. */
   channel(): Channel {
+    if (this.ui.get().speechUnavailable) return "live";
     return this.settings.get().mode === "voiceOver" && !this.ui.get().docAppVoice ? "live" : "speech";
   }
 
@@ -261,9 +265,15 @@ export class AppController {
   start(): void {
     this.sounds.unlock();
     this.env.port.prime();
+    if (!this.env.port.available) {
+      // No speech engine (some embedded browsers): VoiceOver can still read everything.
+      this.ui.update({ speechUnavailable: true });
+    }
     if (this.settings.get().mode === null) {
-      // First launch: the mode is unknown, so the question is always spoken.
-      this.speaker.speak(FIRST_LAUNCH_QUESTION, { priority: "high", lang: UI_LANG });
+      // First launch: the mode is unknown, so the question is always spoken (or, without a
+      // speech engine, announced for VoiceOver).
+      if (this.ui.get().speechUnavailable) this.say(FIRST_LAUNCH_QUESTION);
+      else this.speaker.speak(FIRST_LAUNCH_QUESTION, { priority: "high", lang: UI_LANG });
       this.navigate("mode");
       return;
     }
@@ -1041,10 +1051,15 @@ export class AppController {
       this.pausedByHide = false;
       this.say("Paused. Press Play to continue.");
     }
-    // iOS may end the camera track while the page is hidden; restart it.
-    if (this.ui.get().screen === "camera" && this.videoEl && this.camera?.track.readyState === "ended") {
-      this.cameraIntroPending = "none";
-      void this.attachVideo(this.videoEl);
+    // iOS may end the camera track while the page is hidden; restart it. If the track survived,
+    // the preview element may still be paused, which would freeze the framing analysis.
+    if (this.ui.get().screen === "camera" && this.videoEl) {
+      if (this.camera?.track.readyState === "ended") {
+        this.cameraIntroPending = "none";
+        void this.attachVideo(this.videoEl);
+      } else if (this.camera?.video.paused) {
+        void this.camera.video.play().catch(() => undefined);
+      }
     }
   }
 }

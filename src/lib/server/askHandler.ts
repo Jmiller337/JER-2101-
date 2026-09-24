@@ -1,6 +1,7 @@
 import { spokenError } from "@/lib/shared/messages";
 import { toNdjsonLine } from "@/lib/shared/ndjson";
-import { AskRequestSchema, type AskEvent, type AskRequest, type ChatTurn, type ErrorCode } from "@/lib/shared/protocol";
+import type { AskEvent, AskRequest, ChatTurn, ErrorCode } from "@/lib/shared/protocol";
+import { AskRequestSchema } from "./schemas";
 import { FALLBACK_BETA, type ModelMessage, type StreamParams } from "./anthropic";
 import { checkRequest } from "./auth";
 import { readJsonBody } from "./body";

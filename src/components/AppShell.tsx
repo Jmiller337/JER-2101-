@@ -12,10 +12,15 @@ import { StartScreen } from "./screens/StartScreen";
 
 export function AppShell() {
   const controller = useController();
-  const { screen } = useStore(controller.ui);
+  const { screen, speechUnavailable } = useStore(controller.ui);
   return (
     <>
       <LiveRegions />
+      {speechUnavailable && (
+        <p className="bg-yellow-300 px-4 py-3 text-xl font-bold text-black" data-testid="speech-banner">
+          This browser cannot speak. Open the app in Safari, or turn on VoiceOver to hear it.
+        </p>
+      )}
       {screen === "start" && <StartScreen />}
       {screen === "mode" && <ModeScreen />}
       {screen === "passcode" && <PasscodeScreen />}

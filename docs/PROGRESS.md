@@ -81,3 +81,41 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - `/api/ask` streams NDJSON (`text`, `done`, `error` events) rather than plain text, so a failure part-way through an answer can be announced properly.
 - New document asks for a second press within six seconds when there is a document, so one stray tap cannot throw a document away.
 - A spoken question is echoed ("You asked: …") before the answer, so recognition mistakes are caught.
+
+## Phase 5: hardening and handover
+
+**Works.**
+- Every failure that can be provoked has one spoken sentence with a next step, and an end-to-end test: no network (one automatic retry first), a passcode changed on the server (back to the passcode screen), a refusal, a photo too large, a photo the model cannot read (retake, page number kept), a server without an API key, a stream cut off mid-page (the text that arrived is kept and the page says the rest could not be read), a refused camera, another app's in-app browser, and a browser with no speech engine (a visible banner, and everything goes to the live region so VoiceOver can still read it). In VoiceOver mode none of these is ever spoken by the app's own voice.
+- Web app manifest with `display: "browser"`, icons, the iOS home-screen title, and no standalone flag (see PROMPT.md 6.12).
+- Bundle size: the phone downloads 155 KB of JavaScript (gzipped, 524 KB raw). It was 244 KB until `zod` was removed from the phone's code: the shared protocol now uses small hand-written validators, and `zod` validates request bodies on the server only. An end-to-end test fails if the JavaScript grows past 200 KB gzipped.
+- `Dockerfile` (multi-stage, standalone output, non-root user, health check), `.dockerignore`, and `fly.toml` (HTTPS forced, auto stop and start, health check on `/api/health`, 512 MB machine). The image was built and run locally: it serves the app and icons, answers the health check, and streams a page read line by line. It is about 330 MB.
+- Returning to a visible page on the camera screen restarts a paused preview (iOS can pause it while the phone is locked).
+- `docs/SETUP.md` (Vercel, Fly.io, optional `.dev` domain, iPhone setup, first use, model and cost, privacy, troubleshooting), the finished `docs/TESTING-ON-IPHONE.md`, and a new `README.md`.
+
+**Notes.**
+- Docker Hub rate-limited this build environment's anonymous pulls, so the local image test used Google's mirror of the same official Node image (`--build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-alpine`) and the environment's proxy certificate as a build secret. The committed `Dockerfile` is unchanged by either; Fly's builders pull `node:22-alpine` normally.
+- Fly.io's documentation was not reachable from the build environment. `fly.toml` and the Fly steps in `docs/SETUP.md` use the standard commands and settings; `docs/SETUP.md` tells the owner to check fly.io/docs if a command fails.
+
+## What still needs the owner
+
+1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).
+2. **Deploying** to Vercel or Fly.io and setting `ANTHROPIC_API_KEY` and `APP_PASSCODE` (`docs/SETUP.md` section 2).
+3. **The manual iPhone checklist** (`docs/TESTING-ON-IPHONE.md`) with the user, including the checks that only a real iPhone can answer: that direction cues point the right way, that hand tremor does not block automatic capture, that speech is heard with the silent switch on, the flashlight, the phone call and screen lock behavior, and how VoiceOver reads the transcript.
+4. **Choosing the model** after the first real runs: Claude Opus 5.5 is the default; setting `READ_MODEL` and `ASK_MODEL` to `claude-sonnet-5` makes reading faster and cheaper (`docs/SETUP.md` section 5).
+5. **Merging or renaming the branch** if you want the code on `main`; the deploy steps work from the current default branch as it is.
+
+## Assumptions made while building
+
+Each can be changed; the reason is given.
+
+- **Cue wording** for a phone held flat over a table ("Move away from you", "Lift the phone higher", "Move closer to the page"), because "Move back" and "Move up" are ambiguous in that position (Phase 3).
+- **Framing thresholds** in `FRAMING` (`src/lib/client/vision/framing.ts`) were tuned on synthetic frames and a generated video. "Too small" is below 20 percent of the frame, not 40, because a fully visible letter-sized page covers only 40 to 55 percent of a portrait frame (Phase 3).
+- **The title, warning, and problem are written in English** by the model even for a page in another language, because they are spoken with the English interface voice (Phase 1).
+- **A speed change restarts the current sentence** at the new speed after announcing it; **Spell** leaves the reader paused on the spelled sentence (Phase 2).
+- **Talk is a toggle** (tap to start, tap "Stop and send") rather than hold-to-talk, which is awkward with VoiceOver (Phase 4).
+- **New document needs a second press** within six seconds when there is a document (Phase 4).
+- **Leaving the reading screen** for Settings or Ask pauses silently and resumes on return if it was reading; Add page continues reading page 1 after the capture (Phases 2 and 4).
+- **`/api/ask` streams NDJSON** instead of plain text so an error part-way through can be announced (Phase 4).
+- **Automatic capture fires at most once per visit** to the camera screen and re-arms after a blurry still, a retake, a failed capture, Add page, and New document (Phase 3).
+- **Toolchain:** ESLint 9 and TypeScript 5.9 (the newest majors break Next.js's lint plugins), Playwright pinned to 1.56.1 to match the preinstalled browser (Phase 0).
+- **`FAKE_MODEL=1`** exists for tests and dry runs and must never be set on a deployment; the server logs a warning when it is.

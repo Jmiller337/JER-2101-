@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { readJson, removeKey, writeJson, type StorageLike } from "./storage";
 
 /**
@@ -34,16 +33,29 @@ export const DEFAULT_SETTINGS: Settings = {
 const SETTINGS_KEY = "docreader.settings.v1";
 const PASSCODE_KEY = "docreader.passcode.v1";
 
-const StoredSettings = z
-  .object({
-    mode: z.enum(["readAloud", "voiceOver"]).nullable(),
-    rate: z.number(),
-    voiceURI: z.string().nullable(),
-    autoCapture: z.boolean(),
-    guidance: z.enum(["full", "minimal"]),
-    sounds: z.boolean(),
-  })
-  .partial();
+/**
+ * Keeps each stored field that has the right type and drops the rest, so a corrupt or older
+ * value never breaks the app. Any field with a wrong value makes the whole record untrusted.
+ */
+function parseStoredSettings(value: unknown): Partial<Settings> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  const out: Partial<Settings> = {};
+  const check = (key: keyof Settings, ok: boolean) => {
+    if (v[key] === undefined) return true;
+    if (!ok) return false;
+    (out as Record<string, unknown>)[key] = v[key];
+    return true;
+  };
+  const valid =
+    check("mode", v.mode === null || v.mode === "readAloud" || v.mode === "voiceOver") &&
+    check("rate", typeof v.rate === "number") &&
+    check("voiceURI", v.voiceURI === null || typeof v.voiceURI === "string") &&
+    check("autoCapture", typeof v.autoCapture === "boolean") &&
+    check("guidance", v.guidance === "full" || v.guidance === "minimal") &&
+    check("sounds", typeof v.sounds === "boolean");
+  return valid ? out : null;
+}
 
 export function clampRate(rate: number): number {
   if (!Number.isFinite(rate)) return DEFAULT_SETTINGS.rate;
@@ -53,9 +65,9 @@ export function clampRate(rate: number): number {
 
 /** Loads settings, keeping every valid stored field and defaulting the rest. */
 export function loadSettings(storage: StorageLike | null): Settings {
-  const parsed = StoredSettings.safeParse(readJson(storage, SETTINGS_KEY));
-  if (!parsed.success) return { ...DEFAULT_SETTINGS };
-  const merged = { ...DEFAULT_SETTINGS, ...stripUndefined(parsed.data) };
+  const stored = parseStoredSettings(readJson(storage, SETTINGS_KEY));
+  if (!stored) return { ...DEFAULT_SETTINGS };
+  const merged = { ...DEFAULT_SETTINGS, ...stored };
   return { ...merged, rate: clampRate(merged.rate) };
 }
 
@@ -74,8 +86,4 @@ export function savePasscode(storage: StorageLike | null, passcode: string): voi
 
 export function forgetPasscode(storage: StorageLike | null): void {
   removeKey(storage, PASSCODE_KEY);
-}
-
-function stripUndefined<T extends object>(value: T): Partial<T> {
-  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as Partial<T>;
 }

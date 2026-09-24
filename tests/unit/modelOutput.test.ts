@@ -7,7 +7,7 @@ import {
   parseJsonObjects,
   splitLongText,
 } from "@/lib/server/modelOutput";
-import { ReadEventSchema, type ReadEvent } from "@/lib/shared/protocol";
+import { parseReadEvent, type ReadEvent } from "@/lib/shared/protocol";
 
 const META = { type: "meta", status: "ok", language: "en", kind: "letter", title: "A letter from the bank" };
 const B1 = { type: "block", kind: "heading", text: "First National Bank" };
@@ -23,7 +23,7 @@ function run(text: string, chunkSize = 7, hint: string | null = null): ReadEvent
   const events: ReadEvent[] = [];
   for (let i = 0; i < text.length; i += chunkSize) events.push(...parser.push(text.slice(i, i + chunkSize)));
   events.push(...parser.finish());
-  for (const event of events) expect(ReadEventSchema.safeParse(event).success).toBe(true);
+  for (const event of events) expect(parseReadEvent(event)).toEqual(event);
   return events;
 }
 

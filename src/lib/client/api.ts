@@ -1,7 +1,7 @@
 import { LineSplitter } from "@/lib/shared/ndjson";
 import {
-  AskEventSchema,
-  ReadEventSchema,
+  parseAskEvent,
+  parseReadEvent,
   type AskEvent,
   type AskRequest,
   type ErrorCode,
@@ -30,10 +30,6 @@ export interface ApiClient {
   readPage(body: ReadRequest, passcode: string, onEvent: (event: ReadEvent) => void, signal?: AbortSignal): Promise<void>;
   /** Streams one answer. Throws ApiError if the request fails or the stream is cut off. */
   ask(body: AskRequest, passcode: string, onEvent: (event: AskEvent) => void, signal?: AbortSignal): Promise<void>;
-}
-
-interface SchemaLike<T> {
-  safeParse(value: unknown): { success: true; data: T } | { success: false };
 }
 
 export function createApiClient(opts: { fetch?: typeof fetch; retryDelayMs?: number } = {}): ApiClient {
@@ -70,7 +66,7 @@ export function createApiClient(opts: { fetch?: typeof fetch; retryDelayMs?: num
 
   async function stream<T extends { type: string }>(
     res: Response,
-    schema: SchemaLike<T>,
+    parse: (value: unknown) => T | null,
     onEvent: (event: T) => void,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -87,10 +83,10 @@ export function createApiClient(opts: { fetch?: typeof fetch; retryDelayMs?: num
       } catch {
         return;
       }
-      const parsed = schema.safeParse(value);
-      if (!parsed.success) return; // unknown event types are ignored
-      if (parsed.data.type === "done" || parsed.data.type === "error") finished = true;
-      onEvent(parsed.data);
+      const event = parse(value);
+      if (!event) return; // unknown or malformed events are ignored
+      if (event.type === "done" || event.type === "error") finished = true;
+      onEvent(event);
     };
     try {
       for (;;) {
@@ -113,11 +109,11 @@ export function createApiClient(opts: { fetch?: typeof fetch; retryDelayMs?: num
     },
     async readPage(body, passcode, onEvent, signal) {
       const res = await post("/api/read", body, passcode, signal);
-      await stream(res, ReadEventSchema, onEvent, signal);
+      await stream(res, parseReadEvent, onEvent, signal);
     },
     async ask(body, passcode, onEvent, signal) {
       const res = await post("/api/ask", body, passcode, signal);
-      await stream(res, AskEventSchema, onEvent, signal);
+      await stream(res, parseAskEvent, onEvent, signal);
     },
   };
 }

@@ -102,6 +102,14 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] A page with part cut off: it reads what it can and warns that part is cut off.
 - [ ] Something that is not a document (a hand, the table): it asks you to try again and says why.
 
+## 7a. Errors
+
+- [ ] Turn on Airplane Mode and press Capture. After a short automatic retry the app says "I couldn't reach the reading service. Check your connection, then press Capture to try again." and the camera comes back. Turn Airplane Mode off and capture again.
+- [ ] While a page is being read, turn on Airplane Mode. The part already read stays, the app says it could not reach the service, and the screen says "The rest of this page could not be read."
+- [ ] Ask the owner to change the passcode on the server. The next capture says "The passcode was not accepted. Please enter it again." and shows the passcode screen.
+- [ ] Open the app with the ring/silent switch on silent: speech is still heard (or note that it is not).
+- [ ] With VoiceOver mode on, none of the errors above is spoken by the app's own voice; VoiceOver reads them.
+
 ## 8. Recording results
 
 For each failed item write: the step, what was expected, what happened, and the exact words the app said. Also note the iPhone model and iOS version (Settings, General, About).

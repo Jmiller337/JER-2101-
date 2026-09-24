@@ -1,0 +1,39 @@
+# Fly.io configuration. See docs/SETUP.md, "Option B: Fly.io".
+# Before the first deploy, change `app` to a name of your own (it becomes <name>.fly.dev)
+# and `primary_region` to the region nearest the user (`fly platform regions` lists them).
+
+app = "document-reader-change-me"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Stop the machine when nobody is using the app, and start it again on the next visit.
+  # The first page load after a pause then takes a few extra seconds. To avoid that, set
+  # min_machines_running = 1 (a small machine costs a few dollars a month).
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
