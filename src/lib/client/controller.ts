@@ -678,10 +678,11 @@ export class AppController {
       this.reader.completePage(page.number);
     }
     this.navigate("reading");
+    const title = sentence(doc.title);
     this.say(
       this.appVoiceActive
-        ? `Your document is still here: ${doc.title} Press Play to hear it, or New document to start again.`
-        : `Your document is still here: ${doc.title} Swipe right to read it, or find New document to start again.`,
+        ? `Your document is still here: ${title} Press Play to hear it, or New document to start again.`
+        : `Your document is still here: ${title} Swipe right to read it, or find New document to start again.`,
     );
   }
 
@@ -780,6 +781,7 @@ export class AppController {
       return;
     }
     if (resume) this.reader.resume();
+    else if (this.reader.currentStatus === "ended") this.say("End of document. Press Play to hear it again.");
     else this.say(`${this.reader.positionReport("Paused")} Press Play to continue.`);
   }
 
@@ -1068,8 +1070,14 @@ function baseLang(tag: string): string {
   return tag.toLowerCase().split(/[-_]/)[0] ?? tag;
 }
 
+/** Ends a title with a full stop so the next sentence does not run into it when spoken. */
+function sentence(text: string): string {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.replace(/[.!?]*$/, ".") : "";
+}
+
 function liveTitleAnnouncement(page: DocPage, meta: MetaEvent): string {
-  const title = meta.title ? meta.title.replace(/[.!?]*$/, ".") : "";
+  const title = sentence(meta.title);
   const warning = meta.warning ? ` ${meta.warning}` : "";
   return page.number === 1 ? `${title}${warning}`.trim() || "Reading page 1." : `Page ${page.number}. ${title}${warning}`.trim();
 }

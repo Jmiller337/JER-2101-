@@ -136,7 +136,10 @@ test("an accidental reload keeps the document", async ({ page }) => {
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
-  await expectSpoken(page, /^Your document is still here: A water bill from Riverside Water Utility for October/);
+  await expectSpoken(
+    page,
+    "Your document is still here: A water bill from Riverside Water Utility for October. Press Play to hear it, or New document to start again.",
+  );
   await page.getByRole("button", { name: "Play" }).click();
   await expectSpoken(page, "Riverside Water Utility");
 });
