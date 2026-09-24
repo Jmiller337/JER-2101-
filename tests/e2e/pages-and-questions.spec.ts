@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   captureAndRead,
   clearUtterances,
+  expectAnnounced,
   expectSpoken,
-  liveStatus,
   openToCamera,
   setSpeechSpeed,
   utterances,
@@ -71,6 +71,34 @@ test("asking a question speaks the answer and keeps it on screen", async ({ page
   await expect(page.getByRole("navigation", { name: "Reading controls" })).toBeVisible();
 });
 
+test("a question sent while the last one is still being answered stays in the box", async ({ page }) => {
+  await openToCamera(page);
+  await captureAndRead(page);
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/ask", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Ask a question" }).click();
+  const box = page.getByRole("textbox", { name: "Your question" });
+  await box.fill("How much do I owe?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByRole("button", { name: "Answering…" })).toBeVisible();
+  await expect(box).toHaveValue("");
+
+  await box.fill("What is the phone number?");
+  await box.press("Enter");
+  await expectSpoken(page, "I'm still answering. Wait a moment, then send your question.");
+  await expect(box).toHaveValue("What is the phone number?");
+
+  release();
+  await expectSpoken(page, "You owe 84 dollars and 12 cents, and it is due on October 28, 2026.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expectSpoken(page, /^The phone number is 555-0142/);
+  await expect(box).toHaveValue("");
+});
+
 test("a spoken question is recognized, confirmed, and answered", async ({ page }) => {
   await page.addInitScript(() => {
     class FakeRecognition {
@@ -111,9 +139,10 @@ test("in VoiceOver mode the answer goes to the live region", async ({ page }) =>
   await page.getByRole("button", { name: "Ask a question" }).click();
   await page.getByRole("textbox", { name: "Your question" }).fill("How much do I owe?");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect
-    .poll(() => liveStatus(page))
-    .toBe("Answer: You owe 84 dollars and 12 cents, and it is due on October 28, 2026. Ask another question, or press Back to reading.");
+  await expectAnnounced(
+    page,
+    "Answer: You owe 84 dollars and 12 cents, and it is due on October 28, 2026. Ask another question, or press Back to reading.",
+  );
   expect(await utterances(page)).toEqual([]);
 });
 

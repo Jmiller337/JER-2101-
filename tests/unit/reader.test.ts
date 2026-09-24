@@ -203,19 +203,49 @@ describe("Reader", () => {
     expect(port.speaking).toBe("The bottom of the page is cut off.");
   });
 
-  it("keeps a late block for an earlier page in page order without repeating", () => {
+  it("waits at a page boundary until the earlier page has finished arriving", () => {
     const { port, reader } = setup();
     loadPageOne(reader, { complete: false });
     reader.beginPage(2, { title: "Page two", language: "en" });
     reader.addBlock(2, 0, "paragraph", "Page two text.");
     reader.play();
-    reader.nextParagraph();
-    reader.nextParagraph();
-    reader.nextParagraph();
-    expect(port.speaking).toBe("Page 2.");
+    port.finishAll(); // title, heading, and the two sentences of page 1 so far
+    expect(reader.store.get().status).toBe("waiting");
+    expect(port.texts).not.toContain("Page 2.");
+    // The rest of page 1 arrives: it is read before moving on.
     reader.addBlock(1, 2, "paragraph", "Late page one text.");
+    expect(port.speaking).toBe("Late page one text.");
+    reader.completePage(1);
+    port.finish();
+    expect(port.speaking).toBe("Page 2.");
     port.finish();
     expect(port.speaking).toBe("Page two text.");
+  });
+
+  it("says a notice and carries on from the same sentence", () => {
+    const { port, reader } = setup();
+    loadPageOne(reader);
+    reader.play();
+    port.finish(); // title
+    reader.notice("That is the fastest speed.");
+    expect(port.speaking).toBe("That is the fastest speed.");
+    port.finish();
+    expect(port.speaking).toBe("First National Bank");
+    expect(reader.store.get().status).toBe("playing");
+  });
+
+  it("removes a page to retake it and keeps the position sensible", () => {
+    const { port, reader } = setup();
+    loadPageOne(reader);
+    reader.beginPage(2, { title: "Page two", language: "en" });
+    reader.addBlock(2, 0, "paragraph", "Page two text.");
+    reader.completePage(2);
+    reader.play();
+    port.finishAll();
+    reader.removePage(2);
+    expect(reader.store.get().itemCount).toBe(4);
+    reader.previous();
+    expect(port.speaking).toBe("Please pay by Friday.");
   });
 
   it("stops instead of racing ahead when speech is not allowed", () => {

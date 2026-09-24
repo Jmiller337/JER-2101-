@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
-          // Camera for page capture, microphone for the "Hold to talk" question button.
+          // Camera for page capture, microphone for the "Talk" question button.
           { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { IMAGE_MEDIA_TYPES, MAX_IMAGE_BASE64_CHARS, type AskRequest, type ReadRequest } from "@/lib/shared/protocol";
+import {
+  ASK_LIMITS,
+  IMAGE_MEDIA_TYPES,
+  MAX_IMAGE_BASE64_CHARS,
+  type AskRequest,
+  type ReadRequest,
+} from "@/lib/shared/protocol";
 
 /** Request body for POST /api/read. */
 export const ReadRequestSchema = z.object({
@@ -20,9 +26,9 @@ export const AskRequestSchema = z.object({
   pages: z.array(z.string().max(100_000)).min(1).max(500),
   title: z.string().max(400),
   history: z
-    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) }))
-    .max(40),
-  question: z.string().trim().min(1).max(2000),
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(ASK_LIMITS.historyContent) }))
+    .max(ASK_LIMITS.historyMessages),
+  question: z.string().trim().min(1).max(ASK_LIMITS.question),
 });
 
 // The schemas must produce exactly the shared request types.

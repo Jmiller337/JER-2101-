@@ -70,6 +70,20 @@ export class DocumentSession {
     clearDoc(this.deps.storage);
   }
 
+  /** Removes the last page (to retake it). Only the last page can be removed. */
+  removeLastPage(pageNumber: number): void {
+    const doc = this.doc;
+    const last = doc?.pages[doc.pages.length - 1];
+    if (!doc || !last || last.number !== pageNumber) return;
+    doc.pages.pop();
+    if (doc.pages.length === 0) {
+      this.store.set((s) => ({ ...s, doc: null, version: s.version + 1 }));
+      clearDoc(this.deps.storage);
+      return;
+    }
+    this.changed();
+  }
+
   async readPage(image: PreparedImage, cb: PageReadCallbacks): Promise<ReadOutcome> {
     const pageNumber = this.nextPageNumber;
     const passcode = this.deps.passcode();

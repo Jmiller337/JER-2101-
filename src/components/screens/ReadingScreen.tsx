@@ -27,6 +27,9 @@ export function ReadingScreen() {
   const doc = session.doc;
   const waitingFor = session.awaitingPage;
   const title = doc?.title || (waitingFor ? `Reading page ${waitingFor}…` : "Reading");
+  // A page whose read stopped part way can be photographed again, as long as it is the last page.
+  const lastPage = doc?.pages[doc.pages.length - 1];
+  const retakeNumber = lastPage?.failed && session.activeReads === 0 ? lastPage.number : null;
 
   return (
     <main className="flex min-h-dvh flex-col bg-black text-white">
@@ -53,6 +56,13 @@ export function ReadingScreen() {
               onClick={() => controller.playWithAppVoice()}
               aria-disabled={!doc}
             />
+            {retakeNumber !== null && (
+              <Button
+                label="Retake page"
+                aria-label={`Retake page ${retakeNumber}`}
+                onClick={() => controller.retakePage()}
+              />
+            )}
             <Button label="Ask a question" onClick={() => controller.openAsk()} aria-disabled={!doc} />
             <Button label="Add page" onClick={() => controller.addPage()} aria-disabled={!doc} />
             <Button label="New document" onClick={() => controller.newDocument()} />
@@ -64,6 +74,15 @@ export function ReadingScreen() {
         <ReaderControls
           extra={
             <>
+              {retakeNumber !== null && (
+                <Button
+                  label="Retake page"
+                  aria-label={`Retake page ${retakeNumber}`}
+                  size="normal"
+                  className="col-span-2"
+                  onClick={() => controller.retakePage()}
+                />
+              )}
               <Button label="Ask a question" size="normal" onClick={() => controller.openAsk()} aria-disabled={!doc} />
               <Button label="Add page" size="normal" onClick={() => controller.addPage()} aria-disabled={!doc} />
             </>

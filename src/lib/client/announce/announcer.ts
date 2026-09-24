@@ -6,7 +6,10 @@ import type { LiveRegions } from "./liveRegions";
 export type Channel = "speech" | "live";
 
 export interface AnnounceOptions {
-  /** `high` (default) interrupts reading; `low` is for camera cues and is dropped when busy. */
+  /**
+   * `high` (default) interrupts reading; `low` is for camera cues and is dropped while something
+   * else is being spoken or read out by VoiceOver.
+   */
   priority?: "high" | "low";
   /** Failures go to the alert region in VoiceOver mode. */
   alert?: boolean;
@@ -38,8 +41,8 @@ export class Announcer {
       if (handle?.dropped) return false;
     } else if (opts.alert) {
       this.deps.live.alert(message);
-    } else {
-      this.deps.live.status(message);
+    } else if (this.deps.live.status(message, { priority: opts.priority ?? "high" }) === false) {
+      return false;
     }
     this.lastMessage.set(message);
     return true;

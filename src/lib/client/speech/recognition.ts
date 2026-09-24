@@ -33,40 +33,47 @@ export interface ListenCallbacks {
 }
 
 /**
- * One listening session for a spoken question. The caller stops it (tap again) or it stops by
- * itself after a pause; either way onEnd receives the recognized text.
+ * Listening for a spoken question. Each start() is a fresh session: its recognized text and error
+ * belong to that session only, and events from a session that was aborted or replaced are
+ * ignored. stop() ends the session and delivers onEnd with the text; abort() discards it and
+ * onEnd is never called.
  */
 export class Listener {
   private recognition: RecognitionLike | null = null;
-  private text = "";
-  private error: string | null = null;
 
   start(lang: string, callbacks: ListenCallbacks): boolean {
     const Ctor = getCtor();
     if (!Ctor) return false;
+    this.abort();
     const recognition = new Ctor();
+    let text = "";
+    let error: string | null = null;
     recognition.lang = lang;
     recognition.interimResults = true;
     recognition.continuous = true;
     recognition.onresult = (event) => {
-      let text = "";
-      for (let i = 0; i < event.results.length; i++) text += event.results[i]![0].transcript;
-      this.text = text.trim();
-      callbacks.onText(this.text);
+      if (this.recognition !== recognition) return;
+      let heard = "";
+      for (let i = 0; i < event.results.length; i++) heard += event.results[i]![0].transcript;
+      text = heard.trim();
+      callbacks.onText(text);
     };
     recognition.onerror = (event) => {
-      this.error = event.error;
+      if (this.recognition !== recognition) return;
+      error = event.error;
     };
     recognition.onend = () => {
+      if (this.recognition !== recognition) return;
       this.recognition = null;
-      callbacks.onEnd(this.text, this.text ? null : this.error);
+      callbacks.onEnd(text, text ? null : error);
     };
+    this.recognition = recognition;
     try {
       recognition.start();
     } catch {
+      this.recognition = null;
       return false;
     }
-    this.recognition = recognition;
     return true;
   }
 
@@ -75,8 +82,13 @@ export class Listener {
   }
 
   abort(): void {
-    this.recognition?.abort();
+    const recognition = this.recognition;
     this.recognition = null;
+    try {
+      recognition?.abort();
+    } catch {
+      // already ended
+    }
   }
 
   get active(): boolean {

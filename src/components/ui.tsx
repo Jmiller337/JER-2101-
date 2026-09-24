@@ -28,7 +28,9 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
 /**
  * A native button with a visible text label (principle 7). Primary controls are at least 64 by
  * 64 CSS pixels, secondary at least 48 (principle 8). `aria-disabled` is used instead of
- * `disabled` so VoiceOver can still find the control and hear that it is unavailable.
+ * `disabled` so VoiceOver can still find the control and hear that it is unavailable. The click
+ * handler stays attached: the controller then says why the control cannot be used yet, instead of
+ * a tap doing nothing at all.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { label, variant = "secondary", size = "large", className = "", onClick, ...rest },
@@ -42,7 +44,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={`rounded-2xl font-bold leading-tight ${VARIANTS[variant]} ${SIZES[size]} ${
         unavailable ? "opacity-60" : "active:scale-[0.99]"
       } ${className}`}
-      onClick={unavailable ? undefined : onClick}
+      onClick={onClick}
       {...rest}
     >
       {label}

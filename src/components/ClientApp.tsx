@@ -13,6 +13,9 @@ function getController(): AppController {
   if (!controller) {
     controller = new AppController();
     controller.install();
+    // Tells the start-up fallback in the layout that the app is running.
+    (window as Window & { __docreaderReady?: boolean }).__docreaderReady = true;
+    document.getElementById("startup-status")?.remove();
   }
   return controller;
 }

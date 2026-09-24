@@ -17,6 +17,7 @@ export function StartButtonMarkup({
       <button
         ref={buttonRef}
         type="button"
+        data-start="1"
         onClick={onStart}
         className="m-4 flex flex-1 items-center justify-center rounded-3xl border-4 border-yellow-300 bg-yellow-300 px-6 text-center text-5xl font-extrabold leading-tight text-black"
       >

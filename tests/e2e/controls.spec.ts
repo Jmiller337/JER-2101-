@@ -81,3 +81,16 @@ test.describe("reading controls", () => {
     await expect(page.getByLabel("Reading speed")).toHaveValue("1.4");
   });
 });
+
+test("at the fastest speed, Faster says so and the reading carries on", async ({ page }) => {
+  await openToCamera(page, "readAloud", { rate: 2 });
+  await setSpeechSpeed(page, 40);
+  await captureAndRead(page);
+  await expectSpoken(page, "Riverside Water Utility");
+  const controls = page.getByRole("navigation", { name: "Reading controls" });
+  await controls.getByRole("button", { name: /^Faster/ }).click();
+  await expectSpoken(page, "That is the fastest speed.");
+  await setSpeechSpeed(page, 2);
+  await expectSpoken(page, "Your October bill is ready.");
+  expect((await utterances(page)).filter((u) => u.startsWith("Paused"))).toEqual([]);
+});

@@ -49,6 +49,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Back and Forward move one sentence. Previous paragraph and Next paragraph move one paragraph.
 - [ ] Spell spells the current sentence slowly ("capital R, I, V, …") and then stays paused.
 - [ ] Slower and Faster say the new speed ("Speed 1.1.") and continue at that speed.
+- [ ] At the fastest speed, Faster says "That is the fastest speed." and the reading carries on without stopping.
 - [ ] With a Bluetooth keyboard: Space pauses and plays, the arrow keys move by sentence and paragraph.
 
 ## 3a. Several pages
@@ -68,6 +69,9 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Ask a follow-up that depends on the previous answer ("And how can I pay it?"). The answer makes sense.
 - [ ] In VoiceOver mode the answer is read by VoiceOver, not by the app voice.
 - [ ] Back to reading continues reading if it was reading before.
+- [ ] Ask a question and press Send again while the answer is still coming. The app says "I'm still answering…" and the second question stays in the box.
+- [ ] Ask a question and lock the phone while the answer is being spoken. After unlocking, the app says "Here is the answer again." and repeats it (or "Still answering." and then the answer).
+- [ ] Press Talk, then Back to reading before saying anything. Nothing is sent and the microphone stops.
 
 ## 4. Settings
 
@@ -94,6 +98,8 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] Unclear words are written as "(unclear word)" and doubtful ones as "(possibly)".
 - [ ] "Play with app voice" starts the app's own reading for this document, and the reading controls appear.
 - [ ] Nothing is announced twice.
+- [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and moving the speed slider reads the new speed once.
+- [ ] On the camera screen, VoiceOver reads the whole "Lay the phone flat on the page…" instruction before the first framing cue.
 
 ## 7. Hard cases
 
@@ -105,7 +111,8 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 ## 7a. Errors
 
 - [ ] Turn on Airplane Mode and press Capture. After a short automatic retry the app says "I couldn't reach the reading service. Check your connection, then press Capture to try again." and the camera comes back. Turn Airplane Mode off and capture again.
-- [ ] While a page is being read, turn on Airplane Mode. The part already read stays, the app says it could not reach the service, and the screen says "The rest of this page could not be read."
+- [ ] While a page is being read, turn on Airplane Mode. The part already read stays, reading stops, the app says "I couldn't read the rest of this page. Press Play to hear what I have, or Retake page to photograph it again.", and the screen says "The rest of this page could not be read."
+- [ ] Turn Airplane Mode off and press Retake page. The camera says "Retake page 1" and "Page 1 again…". After the capture the new reading replaces the partial page (no extra page appears).
 - [ ] Ask the owner to change the passcode on the server. The next capture says "The passcode was not accepted. Please enter it again." and shows the passcode screen.
 - [ ] Open the app with the ring/silent switch on silent: speech is still heard (or note that it is not).
 - [ ] With VoiceOver mode on, none of the errors above is spoken by the app's own voice; VoiceOver reads them.

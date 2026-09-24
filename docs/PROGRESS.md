@@ -85,9 +85,9 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 ## Phase 5: hardening and handover
 
 **Works.**
-- Every failure that can be provoked has one spoken sentence with a next step, and an end-to-end test: no network (one automatic retry first), a passcode changed on the server (back to the passcode screen), a refusal, a photo too large, a photo the model cannot read (retake, page number kept), a server without an API key, a stream cut off mid-page (the text that arrived is kept and the page says the rest could not be read), a refused camera, another app's in-app browser, and a browser with no speech engine (a visible banner, and everything goes to the live region so VoiceOver can still read it). In VoiceOver mode none of these is ever spoken by the app's own voice.
-- Web app manifest with `display: "browser"`, icons, the iOS home-screen title, and no standalone flag (see PROMPT.md 6.12).
-- Bundle size: the phone downloads 155 KB of JavaScript (gzipped, 524 KB raw). It was 244 KB until `zod` was removed from the phone's code: the shared protocol now uses small hand-written validators, and `zod` validates request bodies on the server only. An end-to-end test fails if the JavaScript grows past 200 KB gzipped.
+- Every failure that can be provoked has one spoken sentence with a next step, and an end-to-end test: no network (one automatic retry first), a passcode changed on the server (back to the passcode screen), a refusal, a photo too large, a photo the model cannot read (retake, page number kept), a server without an API key, a stream cut off mid-page (the text that arrived is kept, reading stops there, and Retake page photographs that page again), a refused camera, another app's in-app browser, and a browser with no speech engine (a visible banner, and everything goes to the live region so VoiceOver can still read it). In VoiceOver mode none of these is ever spoken by the app's own voice.
+- Web app manifest with `display: "browser"`, icons, the iOS home-screen title, and the standalone flag turned off (see PROMPT.md 6.12).
+- Bundle size: the phone downloads 157 KB of JavaScript (gzipped, 531 KB raw). It was 244 KB until `zod` was removed from the phone's code: the shared protocol now uses small hand-written validators, and `zod` validates request bodies on the server only. An end-to-end test fails if the JavaScript grows past 200 KB gzipped.
 - `Dockerfile` (multi-stage, standalone output, non-root user, health check), `.dockerignore`, and `fly.toml` (HTTPS forced, auto stop and start, health check on `/api/health`, 512 MB machine). The image was built and run locally: it serves the app and icons, answers the health check, and streams a page read line by line. It is about 330 MB.
 - Returning to a visible page on the camera screen restarts a paused preview (iOS can pause it while the phone is locked).
 - Each page keeps the JPEG it was read from in memory for the session (PROMPT.md 6.4 and 6.9), for a future re-read or questions about the image. It is never written to `sessionStorage`.
@@ -96,6 +96,23 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 **Notes.**
 - Docker Hub rate-limited this build environment's anonymous pulls, so the local image test used Google's mirror of the same official Node image (`--build-arg NODE_IMAGE=mirror.gcr.io/library/node:22-alpine`) and the environment's proxy certificate as a build secret. The committed `Dockerfile` is unchanged by either; Fly's builders pull `node:22-alpine` normally.
 - Fly.io's documentation was not reachable from the build environment. `fly.toml` and the Fly steps in `docs/SETUP.md` use the standard commands and settings; `docs/SETUP.md` tells the owner to check fly.io/docs if a command fails.
+
+## Fixes from an independent review
+
+A separate review of the finished code found these problems. Each is fixed and, where a browser can show it, covered by a test.
+
+- **Older iPhones.** The build targeted Safari 16.4, so on iOS 16.0 to 16.3 the app would not have started at all. The browser targets now include iOS 16, an end-to-end test fails if the shipped code contains syntax those versions cannot parse, and if the app still cannot start, tapping Start says so aloud.
+- **A page cut off part way.** Reading used to carry on to "End of document" and the app sent the user back to the camera. Now reading stops at the gap, the app says "I couldn't read the rest of this page. Press Play to hear what I have, or Retake page to photograph it again.", and Retake page replaces that page with a new photo.
+- **Pages in order.** When page 2 arrived before page 1 had finished streaming, the reader could start page 2 early. It now waits at the page boundary until page 1 is complete.
+- **Leaving the Ask screen** stops the microphone and any answer still being spoken or streamed. A question sent while the previous one is still being answered is refused with a spoken reason, and the typed question stays in the box.
+- **Screen lock during an answer.** The answer is no longer lost: on return the app says "Here is the answer again." and repeats it, or "Still answering." and speaks it when it is complete.
+- **Speech recognition.** Results from a cancelled listening session can no longer be sent as a question, and cancelling never sends one.
+- **Short notices while reading** ("That is the fastest speed.", the New document confirmation, "Wait a moment…") are said and then the reading carries on, instead of stopping it.
+- **Unavailable buttons** (for example Ask a question before a page has been read) now say why when pressed, instead of doing nothing.
+- **VoiceOver announcements.** Messages that arrive together are spaced out so VoiceOver hears each one, a repeated message is announced again, and camera cues wait until VoiceOver has had time to read the previous message (the app voice already worked this way). Switches and the speed slider are no longer announced twice: VoiceOver reads their new state itself.
+- **Question history** sends the last five questions and answers, each trimmed to the length the server accepts, so one very long answer can no longer make every later question fail.
+- **The home-screen icon** explicitly opens the app in Safari, not as a standalone web app.
+- **`FAKE_MODEL=1`** is now ignored, with an error in the log, when the server runs on Vercel or Fly.io, so a stray setting can never make a real deployment read out invented text.
 
 ## What still needs the owner
 
@@ -118,6 +135,6 @@ Each can be changed; the reason is given.
 - **Leaving the reading screen** for Settings or Ask pauses silently and resumes on return if it was reading; Add page continues reading page 1 after the capture (Phases 2 and 4).
 - **`/api/ask` streams NDJSON** instead of plain text so an error part-way through can be announced (Phase 4).
 - **Automatic capture fires at most once per visit** to the camera screen and re-arms after a blurry still, a retake, a failed capture, Add page, and New document (Phase 3).
-- **Minimum iOS 16.4** (the spec assumed 16): Next.js 16 and Tailwind CSS v4 both target Safari 16.4 and newer. Any iPhone on iOS 16 can update to 16.4 or later.
+- **Minimum iOS 16**, as the spec says. The build avoids syntax that iOS 16.0 to 16.3 cannot parse and a test checks for it. Tailwind CSS v4 officially targets Safari 16.4; its newer CSS features have fallbacks, but the look on iOS 16.0 to 16.3 has not been seen on a device.
 - **Toolchain:** ESLint 9 and TypeScript 5.9 (the newest majors break Next.js's lint plugins), Playwright pinned to 1.56.1 to match the preinstalled browser (Phase 0).
-- **`FAKE_MODEL=1`** exists for tests and dry runs and must never be set on a deployment; the server logs a warning when it is.
+- **`FAKE_MODEL=1`** exists for tests and dry runs. It is ignored on Vercel and Fly.io, and the server logs a warning whenever it is used.

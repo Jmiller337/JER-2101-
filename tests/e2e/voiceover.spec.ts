@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { liveStatus, openApp, PASSCODE, utterances } from "./helpers";
+import { expectAnnounced, openApp, PASSCODE, utterances } from "./helpers";
 
 test("VoiceOver mode: status goes to the live region and the app voice stays silent", async ({ page }) => {
   await openApp(page);
@@ -7,16 +7,16 @@ test("VoiceOver mode: status goes to the live region and the app voice stays sil
   await page.getByRole("button", { name: /I use VoiceOver/ }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Enter the passcode" })).toBeVisible();
-  await expect.poll(() => liveStatus(page)).toBe("Enter the passcode, then press Continue.");
+  await expectAnnounced(page, "Enter the passcode, then press Continue.");
 
   await page.getByLabel("Passcode").fill(PASSCODE);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
-  await expect.poll(() => liveStatus(page)).toMatch(/^Lay the phone flat on the page/);
+  await expectAnnounced(page, /^Lay the phone flat on the page/);
 
   // Automatic capture (the fake camera shows a steady page).
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();
-  await expect.poll(() => liveStatus(page)).toBe("Page 1 ready. 7 paragraphs. Swipe right to read.");
+  await expectAnnounced(page, "Page 1 ready. 7 paragraphs. Swipe right to read.");
 
   // The transcript is plain text for VoiceOver: markers written out, no highlight spans.
   const transcript = page.getByTestId("transcript");

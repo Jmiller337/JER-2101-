@@ -13,11 +13,61 @@ export interface SeedSettings {
 }
 
 /**
+ * Records every message written to the live regions, in order, in `window.__announcements`.
+ * Messages can be replaced within a second, so tests check this history rather than sampling
+ * the region's current text.
+ */
+export function recordAnnouncements() {
+  const log: Array<{ region: string; text: string }> = [];
+  (window as unknown as { __announcements: typeof log }).__announcements = log;
+  const last: Record<string, string> = {};
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      const node = mutation.target;
+      const el = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+      const region = el?.closest("[data-testid='live-status'], [data-testid='live-alert']");
+      if (!region) continue;
+      const name = region.getAttribute("data-testid") === "live-alert" ? "alert" : "status";
+      const text = region.textContent ?? "";
+      if (text && text !== last[name]) log.push({ region: name, text });
+      last[name] = text;
+    }
+  });
+  observer.observe(document, { subtree: true, childList: true, characterData: true });
+}
+
+/** Everything announced so far in one live region. */
+export async function announcements(page: Page, region: "status" | "alert" = "status"): Promise<string[]> {
+  return page.evaluate(
+    (name) =>
+      (window as unknown as { __announcements: Array<{ region: string; text: string }> }).__announcements
+        .filter((a) => a.region === name)
+        .map((a) => a.text),
+    region,
+  );
+}
+
+/** Waits until a live region has announced the text (VoiceOver mode). */
+export async function expectAnnounced(page: Page, text: string | RegExp, region: "status" | "alert" = "status") {
+  try {
+    await expect
+      .poll(async () => (await announcements(page, region)).some((a) => (typeof text === "string" ? a === text : text.test(a))), {
+        message: `expected the ${region} region to announce ${String(text)}`,
+      })
+      .toBe(true);
+  } catch (err) {
+    console.log(`Announced so far (${region}):\n  ${(await announcements(page, region)).join("\n  ")}`);
+    throw err;
+  }
+}
+
+/**
  * Opens the app with the fake speech engine. `settings` seeds localStorage (only on the first
  * load, so a reload inside a test keeps what the app saved); `passcode` seeds the passcode.
  */
 export async function openApp(page: Page, opts: { settings?: SeedSettings; passcode?: boolean } = {}) {
   await page.addInitScript(installFakeSpeech);
+  await page.addInitScript(recordAnnouncements);
   if (opts.settings || opts.passcode) {
     const settings = opts.settings
       ? { mode: null, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true, ...opts.settings }
@@ -53,10 +103,6 @@ export async function expectSpoken(page: Page, text: string | RegExp) {
     console.log(`Spoken so far:\n  ${(await utterances(page)).join("\n  ")}`);
     throw err;
   }
-}
-
-export async function liveStatus(page: Page): Promise<string> {
-  return (await page.getByTestId("live-status").textContent()) ?? "";
 }
 
 /** Slows the fake speech engine so a test can interact while a sentence is still being spoken. */

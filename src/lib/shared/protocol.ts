@@ -30,6 +30,13 @@ export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 /** Largest base64 image string accepted (about 7.5 MB decoded; the body cap is 6 MB anyway). */
 export const MAX_IMAGE_BASE64_CHARS = 10_000_000;
 
+/** Limits on POST /api/ask bodies, shared so the phone never sends what the server rejects. */
+export const ASK_LIMITS = {
+  question: 2000,
+  historyMessages: 40,
+  historyContent: 8000,
+} as const;
+
 export const LIMITS_TEXT = {
   language: 35,
   kind: 60,

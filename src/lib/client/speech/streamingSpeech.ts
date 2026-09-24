@@ -32,6 +32,11 @@ export class StreamingSpeech {
     this.extract(true);
   }
 
+  /** Still has something to say (not stopped, and not yet finished speaking). */
+  get active(): boolean {
+    return !this.stopped && !this.doneCalled;
+  }
+
   /** Stops speaking and discards anything not yet spoken. */
   stop(): void {
     this.stopped = true;

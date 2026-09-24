@@ -7,8 +7,8 @@
     "node": ">=20.9"
   },
   "browserslist": [
-    "ios_saf >= 16.4",
-    "safari >= 16.4",
+    "ios_saf >= 16",
+    "safari >= 16",
     "chrome >= 111",
     "edge >= 111",
     "firefox >= 111"

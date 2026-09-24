@@ -15,7 +15,7 @@ You will:
 
 - **An Anthropic API key.** Sign in at [platform.claude.com](https://platform.claude.com), open Settings, then API keys, and create a key. Add a payment method and a spending limit under Billing. Reading a page costs about 3 cents and a question about 1 cent, so 20 pages a day is well under a dollar. A monthly limit of 20 dollars is plenty.
 - **A passcode** for the app. Make it at least 12 characters, for example three random words. It stops strangers who find the address from using your API key. You will type it once on the iPhone.
-- **An iPhone with iOS 16.4 or newer** (iOS 17 or newer recommended). Check under Settings, General, About.
+- **An iPhone with iOS 16 or newer** (iOS 17 or newer recommended). Check under Settings, General, About.
 - **This repository on GitHub** (it already is: `Jmiller337/JER-2101-`). The code is on the branch `claude/jolly-planck-dldb0u`, which is currently the repository's default branch.
 
 Keep the key and the passcode somewhere safe, such as a password manager. Never put them in the code or in a chat.
@@ -167,3 +167,5 @@ The server logs one line per request with timings, token counts, and the outcome
 | No sound | Volume up, silent switch to ring, and check the app is not in VoiceOver mode (app Settings). |
 | The first page takes a long time after a pause (Fly.io) | The server was asleep. See `min_machines_running` above. |
 | Reading is slow | Switch to Claude Sonnet 5 (section 5). |
+| Tapping Start says "This app could not start…" | Check the internet connection and reload the page. If it keeps happening, update the iPhone (Settings, General, Software Update): the app needs iOS 16 or newer. |
+| Tapping Start says "Still loading. Tap again in a moment." | The app is still downloading on a slow connection. Wait a few seconds and tap again. |

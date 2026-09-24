@@ -28,7 +28,6 @@ export function CameraScreen() {
   }, [controller]);
 
   const docInProgress = (session.doc?.pages.length ?? 0) > 0;
-  const heading = ui.addingPage ? `Add page ${ui.addingPage}` : "Camera";
   const cameraFailed = ui.cameraStatus === "error";
   const openPhoneCamera = () => fileRef.current?.click();
 
@@ -45,7 +44,7 @@ export function CameraScreen() {
       />
       <div className="relative z-10 flex h-full flex-col gap-3 p-4">
         <h1 ref={headingRef} tabIndex={-1} className="shrink-0 self-start rounded-xl bg-black/80 px-3 py-1 text-3xl font-bold">
-          {heading}
+          {ui.cameraTitle}
         </h1>
         {/* The status line may be clipped on a short screen; it is spoken anyway, and the
             Capture button must never be pushed off the bottom. */}

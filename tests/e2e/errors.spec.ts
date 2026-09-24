@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectSpoken, openApp, openToCamera, utterances } from "./helpers";
+import { expectAnnounced, expectSpoken, openApp, openToCamera, recordAnnouncements, utterances } from "./helpers";
 
 function ndjson(...events: unknown[]): string {
   return events.map((e) => JSON.stringify(e)).join("\n") + "\n";
@@ -74,7 +74,7 @@ test("a server without an API key says it is not set up", async ({ page }) => {
   await expectSpoken(page, "The reading service is not set up correctly. The API key or passcode on the server needs checking.");
 });
 
-test("a stream cut off mid-page keeps what arrived and says the rest is missing", async ({ page }) => {
+test("a stream cut off mid-page keeps what arrived, and Retake page replaces it", async ({ page }) => {
   await openToCamera(page);
   await captureWith(page, (route) =>
     route.fulfill({
@@ -87,19 +87,30 @@ test("a stream cut off mid-page keeps what arrived and says the rest is missing"
   );
   await expect(page.getByTestId("transcript")).toContainText("The first paragraph arrived.");
   await expect(page.getByTestId("transcript")).toContainText("The rest of this page could not be read.");
-  await expectSpoken(page, "I couldn't reach the reading service. Check your connection, then press Capture to try again.");
+  await expectSpoken(page, "I couldn't read the rest of this page. Press Play to hear what I have, or Retake page to photograph it again.");
+  // The app stays on the reading screen: the user decides what happens next.
+  await expect(page.getByRole("heading", { level: 1, name: "A short letter" })).toBeVisible();
+
+  await page.unroute("**/api/read");
+  await page.getByRole("button", { name: "Retake page 1" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Retake page 1" })).toBeVisible();
+  await expectSpoken(page, "Page 1 again. Lay the phone flat on the page, then lift it slowly.");
+  await page.getByRole("button", { name: "Capture" }).click();
+  await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
+  await expect(page.getByTestId("transcript")).not.toContainText("The first paragraph arrived.");
+  await expect(page.getByRole("heading", { level: 2, name: "Page 2" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retake page 1" })).toHaveCount(0);
 });
 
 test("without a speech engine the app says so and uses the live region", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "speechSynthesis", { value: undefined, configurable: true });
   });
+  await page.addInitScript(recordAnnouncements);
   await page.goto("/");
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expect(page.getByTestId("speech-banner")).toContainText("This browser cannot speak.");
-  await expect
-    .poll(() => page.getByTestId("live-status").textContent())
-    .toContain("Do you use VoiceOver?");
+  await expectAnnounced(page, /Do you use VoiceOver\?/);
 });
 
 test("the app never speaks in VoiceOver mode, even for errors", async ({ page }) => {
@@ -107,8 +118,6 @@ test("the app never speaks in VoiceOver mode, even for errors", async ({ page })
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
   await captureWith(page, (route) => route.abort("internetdisconnected"));
-  await expect
-    .poll(() => page.getByTestId("live-alert").textContent())
-    .toBe("I couldn't reach the reading service. Check your connection, then press Capture to try again.");
+  await expectAnnounced(page, "I couldn't reach the reading service. Check your connection, then press Capture to try again.", "alert");
   expect(await utterances(page)).toEqual([]);
 });

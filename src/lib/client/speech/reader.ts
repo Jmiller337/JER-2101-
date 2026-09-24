@@ -278,6 +278,38 @@ export class Reader {
   }
 
   /**
+   * A short message while the reader may be reading ("That is the fastest speed."): say it, then
+   * carry on from the current sentence, instead of the message silently stopping the reading.
+   */
+  notice(text: string): void {
+    if (ACTIVE.has(this.status)) {
+      this.invalidate();
+      this.deps.speaker.cancelContent();
+      this.setStatus("playing");
+      this.sayThenContinue(text);
+    } else {
+      this.say(text);
+    }
+  }
+
+  /** Removes a page (to retake it). The position moves to where the page was. */
+  removePage(page: number): void {
+    if (!this.pages.has(page)) return;
+    this.invalidate();
+    this.deps.speaker.cancelContent();
+    const first = this.items.findIndex((item) => item.page === page);
+    const removed = this.items.filter((item) => item.page === page).length;
+    this.items = this.items.filter((item) => item.page !== page);
+    this.pages.delete(page);
+    if (first !== -1) {
+      if (this.index >= first + removed) this.index -= removed;
+      else if (this.index > first) this.index = first;
+    }
+    if (ACTIVE.has(this.status)) this.status = "paused";
+    this.emit();
+  }
+
+  /**
    * After a new page is captured. If the document had ended, the new page is announced with
    * "Page N added." and read from its start; otherwise reading continues where it was and flows
    * into the new page at the boundary.
@@ -325,6 +357,12 @@ export class Reader {
       return;
     }
     const item = this.items[this.index]!;
+    if (this.startsPage(this.index) && this.earlierPageIncomplete(item.page)) {
+      // The previous page is still arriving: wait for the rest of it rather than skip ahead.
+      this.setStatus("waiting");
+      this.armWait(t);
+      return;
+    }
     let spoken = item.spoken;
     if (this.pendingAddedPage !== null && item.kind === "pageStart" && item.page === this.pendingAddedPage) {
       spoken = `Page ${item.page} added.`;
@@ -389,6 +427,15 @@ export class Reader {
     this.say(END_OF_DOCUMENT);
   }
 
+  private startsPage(index: number): boolean {
+    return index === 0 || this.items[index - 1]!.page !== this.items[index]!.page;
+  }
+
+  private earlierPageIncomplete(page: number): boolean {
+    for (const [number, info] of this.pages) if (number < page && !info.complete) return true;
+    return false;
+  }
+
   private currentUnitStart(): number {
     let k = Math.min(this.index, this.items.length - 1);
     while (k > 0 && !this.items[k]!.unitStart) k -= 1;
@@ -431,9 +478,11 @@ export class Reader {
     let at = oldLength;
     while (at > 0 && this.items[at - 1]!.page > item.page) at -= 1;
     this.items.splice(at, 0, item);
-    // Keep pointing at the same item. When waiting past the end, an item appended at the end
-    // becomes the next one to speak.
-    if (at < this.index || (at === this.index && this.index < oldLength)) this.index += 1;
+    // Keep pointing at the same item while it is being spoken. When the reader is waiting (past
+    // the end, or at the start of a later page while an earlier page is still arriving), the new
+    // item becomes the next one to speak.
+    const speakingCurrent = this.status === "playing" || this.status === "spelling";
+    if (at < this.index || (at === this.index && this.index < oldLength && speakingCurrent)) this.index += 1;
   }
 
   /** Speaks one of the reader's own sentences, with no continuation. */

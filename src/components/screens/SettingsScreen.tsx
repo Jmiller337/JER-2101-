@@ -107,7 +107,7 @@ export function SettingsScreen() {
           step={RATE_STEP}
           value={settings.rate}
           aria-valuetext={`Speed ${settings.rate.toFixed(1)}`}
-          onChange={(event) => controller.setRate(Number(event.target.value))}
+          onChange={(event) => controller.setRate(Number(event.target.value), "slider")}
           className="h-12 w-full accent-yellow-300"
         />
         <div className="grid grid-cols-2 gap-3">

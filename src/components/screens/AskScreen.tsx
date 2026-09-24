@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ASK_LIMITS } from "@/lib/shared/protocol";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { Button } from "../ui";
 
@@ -29,9 +30,8 @@ export function AskScreen() {
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          const question = value;
-          setDraft("");
-          void controller.submitQuestion(question);
+          // Clear the box only when the question was accepted, so nothing typed is lost.
+          if (controller.submitQuestion(value)) setDraft("");
         }}
       >
         <label htmlFor="question" className="text-2xl font-semibold">
@@ -40,6 +40,7 @@ export function AskScreen() {
         <textarea
           id="question"
           rows={3}
+          maxLength={ASK_LIMITS.question}
           value={value}
           readOnly={ask.listening}
           onChange={(event) => setDraft(event.target.value)}

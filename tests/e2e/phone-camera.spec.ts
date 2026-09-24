@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectSpoken, liveStatus, openApp, openToCamera } from "./helpers";
+import { announcements, expectAnnounced, expectSpoken, openApp, openToCamera } from "./helpers";
 
 test("a photo from the phone's own camera is read like a capture", async ({ page }) => {
   await openToCamera(page);
@@ -14,15 +14,17 @@ test("when the camera is refused, the phone camera becomes the main button", asy
   });
   await openApp(page, { settings: { mode: "voiceOver", autoCapture: true }, passcode: true });
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
-  await expect
-    .poll(() => page.getByTestId("live-alert").textContent())
-    .toBe("I can't use the camera. In Settings, open Safari, then Camera, and choose Allow. Then come back here.");
+  await expectAnnounced(
+    page,
+    "I can't use the camera. In Settings, open Safari, then Camera, and choose Allow. Then come back here.",
+    "alert",
+  );
   await expect(page.getByRole("button", { name: "Capture" })).toHaveCount(0);
   const fallback = page.getByRole("button", { name: "Use phone camera instead" });
   await expect(fallback).toBeVisible();
   const box = await fallback.boundingBox();
   expect(box!.height).toBeGreaterThan(150);
-  expect(await liveStatus(page)).not.toContain("Lay the phone flat");
+  expect((await announcements(page)).filter((a) => a.includes("Lay the phone flat"))).toEqual([]);
 });
 
 test("inside another app's browser, it asks for Safari", async ({ page }) => {
@@ -35,5 +37,5 @@ test("inside another app's browser, it asks for Safari", async ({ page }) => {
   });
   await openApp(page, { settings: { mode: "voiceOver" }, passcode: true });
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
-  await expect.poll(() => page.getByTestId("live-alert").textContent()).toBe("Please open this page in Safari.");
+  await expectAnnounced(page, "Please open this page in Safari.", "alert");
 });

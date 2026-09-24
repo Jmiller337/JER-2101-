@@ -1,5 +1,5 @@
 import { CAMERA_MESSAGES, spokenError } from "@/lib/shared/messages";
-import type { ChatTurn, ErrorCode, MetaEvent } from "@/lib/shared/protocol";
+import { ASK_LIMITS, type ChatTurn, type ErrorCode, type MetaEvent } from "@/lib/shared/protocol";
 import { Announcer, type AnnounceOptions, type Channel } from "./announce/announcer";
 import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
@@ -49,6 +49,8 @@ export interface UiState {
   docAppVoice: boolean;
   /** The page number being captured when adding a page, or null for a new document. */
   addingPage: number | null;
+  /** Heading of the camera screen: "Camera", "Add page 2", or "Retake page 2". */
+  cameraTitle: string;
   /** Screens move focus when this changes. */
   focus: { target: FocusTarget; seq: number };
   /** The browser has no speech engine: everything goes to the live region and a banner shows. */
@@ -130,10 +132,9 @@ export class AppController {
   private cameraWaiters: Array<(camera: CameraHandle | null) => void> = [];
   private videoToken = 0;
   private videoEl: HTMLVideoElement | null = null;
-  private loadingTicker: unknown = null;
   private resumeOnReturn = false;
   private pausedByHide = false;
-  private cameraIntroPending: "full" | "addPage" | "none" = "full";
+  private cameraIntroPending: "full" | "addPage" | "retake" | "none" = "full";
   private readonly sampler = new FrameSampler();
   private tracker = new FramingTracker();
   private readonly cuePolicy = new CuePolicy();
@@ -147,6 +148,11 @@ export class AppController {
   private readonly listener = new Listener();
   private nextTurnId = 1;
   private newDocumentArmedUntil = 0;
+  /** The page being retaken (its partial text is replaced when the new photo is captured). */
+  private retakeTarget: number | null = null;
+  /** An answer interrupted by the page being hidden is spoken again on return. */
+  private answerReplay: "none" | "onReturn" | "whenDone" = "none";
+  private readonly tickers = new Map<string, unknown>();
 
   constructor(env: ControllerEnv = browserEnv()) {
     this.env = env;
@@ -163,6 +169,7 @@ export class AppController {
       errorText: null,
       docAppVoice: false,
       addingPage: null,
+      cameraTitle: "Camera",
       focus: { target: "heading", seq: 0 },
       speechUnavailable: false,
     });
@@ -251,10 +258,27 @@ export class AppController {
   }
 
   private navigate(screen: Screen): void {
-    if (screen !== "camera" && this.ui.get().screen === "camera") this.ui.update({ capturing: false });
+    const from = this.ui.get().screen;
+    if (screen !== "camera" && from === "camera") this.ui.update({ capturing: false });
+    // Whatever takes the user away from Ask (Back, or a failed page read) ends its work there.
+    if (from === "ask" && screen !== "ask") this.teardownAsk();
     this.ui.update({ screen, errorText: null, focus: { target: "heading", seq: this.ui.get().focus.seq + 1 } });
-    // Keep the screen on while framing a page or listening to one.
-    this.env.wakeLock?.setWanted(screen === "camera" || screen === "reading");
+    // Keep the screen on while framing a page, listening to one, or hearing an answer.
+    this.env.wakeLock?.setWanted(screen === "camera" || screen === "reading" || screen === "ask");
+  }
+
+  /**
+   * A short message that must not silently stop reading: while the app voice is reading, the
+   * reader says it and carries on; otherwise it is an ordinary announcement.
+   */
+  private notify(text: string): void {
+    if (this.appVoiceActive && this.ui.get().screen === "reading" && this.reader.isActive) this.reader.notice(text);
+    else this.say(text);
+  }
+
+  /** For controls whose new state VoiceOver reads by itself (sliders, switches, pickers). */
+  private sayUnlessVoiceOver(text: string): void {
+    if (this.channel() === "speech") this.say(text);
   }
 
   // -------------------------------------------------------------------------
@@ -345,9 +369,16 @@ export class AppController {
   // Camera
   // -------------------------------------------------------------------------
 
-  private async openCamera(opts: { first?: boolean; addPage?: number | null; intro?: "full" | "addPage" | "none" }): Promise<void> {
-    this.ui.update({ addingPage: opts.addPage ?? null, cameraError: null });
-    this.cameraIntroPending = opts.intro ?? (opts.addPage ? "addPage" : "full");
+  private async openCamera(opts: {
+    first?: boolean;
+    addPage?: number | null;
+    retake?: number;
+    intro?: "full" | "addPage" | "retake" | "none";
+  }): Promise<void> {
+    const page = opts.retake ?? opts.addPage ?? null;
+    const cameraTitle = opts.retake ? `Retake page ${opts.retake}` : opts.addPage ? `Add page ${opts.addPage}` : "Camera";
+    this.ui.update({ addingPage: page, cameraTitle, cameraError: null });
+    this.cameraIntroPending = opts.intro ?? (opts.retake ? "retake" : opts.addPage ? "addPage" : "full");
     if (opts.first && !(await cameraPermissionGranted())) this.say(CAMERA_PERMISSION_LINE);
     this.navigate("camera");
   }
@@ -512,10 +543,10 @@ export class AppController {
   private speakCameraIntro(): void {
     const intro = this.cameraIntroPending;
     this.cameraIntroPending = "none";
+    const page = this.ui.get().addingPage ?? this.session.nextPageNumber;
     if (intro === "full") this.say(CAMERA_INTRO);
-    else if (intro === "addPage") {
-      this.say(`Page ${this.ui.get().addingPage ?? this.session.nextPageNumber}. Lay the phone flat on the next page, then lift it slowly.`);
-    }
+    else if (intro === "addPage") this.say(`Page ${page}. Lay the phone flat on the next page, then lift it slowly.`);
+    else if (intro === "retake") this.say(`Page ${page} again. Lay the phone flat on the page, then lift it slowly.`);
   }
 
   /** The Capture button: takes the picture at once, with no framing checks (principle 4). */
@@ -550,6 +581,7 @@ export class AppController {
       await this.processCapture(image.source, image.width, image.height);
     } catch (err) {
       this.ui.update({ capturing: false });
+      this.armed = true;
       this.fail("I couldn't open that photo. Please try again.", err instanceof Error ? err.message : undefined);
     }
   }
@@ -568,6 +600,13 @@ export class AppController {
   // -------------------------------------------------------------------------
 
   private startPageRead(image: PreparedImage): void {
+    const retake = this.retakeTarget;
+    this.retakeTarget = null;
+    if (retake !== null) {
+      // The new photo replaces the page that could only be read in part.
+      this.reader.removePage(retake);
+      this.session.removeLastPage(retake);
+    }
     const adding = (this.session.doc?.pages.length ?? 0) > 0;
     const pageNumber = this.session.nextPageNumber;
     if (!adding) {
@@ -609,7 +648,8 @@ export class AppController {
         this.stopLoadingTicker();
         if (page) {
           this.reader.completePage(page.number);
-          this.reader.setLoading(this.session.isReading);
+          // Stop here rather than reading on to "End of document": the user chooses what next.
+          this.reader.pause({ silent: true });
         } else {
           this.quietReaderAfterFailedCapture(adding);
         }
@@ -620,8 +660,12 @@ export class AppController {
           this.fail("The passcode was not accepted. Please enter it again.");
           return;
         }
+        if (page) {
+          this.fail(partialPageMessage(page.number, this.canRetake(page.number), this.appVoiceActive), `Reading stopped early: ${code}`);
+          return;
+        }
         this.fail(message, `Reading failed: ${code}`);
-        if (!page) void this.openCamera({ addPage: adding ? pageNumber : null, intro: "none" });
+        void this.openCamera({ addPage: adding ? pageNumber : null, intro: "none" });
       },
     });
     // The session counts a read as finished only after its stream closes; then the reader knows
@@ -655,18 +699,28 @@ export class AppController {
 
   /** In VoiceOver mode nothing speaks while waiting for the first line, so tick instead. */
   private startLoadingTicker(): void {
-    this.stopLoadingTicker();
-    const tick = () => {
-      this.sounds.tick();
-      this.loadingTicker = this.env.timers.setTimeout(tick, 2000);
-    };
-    this.loadingTicker = this.env.timers.setTimeout(tick, 2000);
+    this.startTicker("page");
   }
 
   private stopLoadingTicker(): void {
-    if (this.loadingTicker !== null) {
-      this.env.timers.clearTimeout(this.loadingTicker);
-      this.loadingTicker = null;
+    this.stopTicker("page");
+  }
+
+  /** A soft tick every two seconds (after two seconds) until stopped. */
+  private startTicker(name: string): void {
+    this.stopTicker(name);
+    const tick = () => {
+      this.sounds.tick();
+      this.tickers.set(name, this.env.timers.setTimeout(tick, 2000));
+    };
+    this.tickers.set(name, this.env.timers.setTimeout(tick, 2000));
+  }
+
+  private stopTicker(name: string): void {
+    const handle = this.tickers.get(name);
+    if (handle !== undefined) {
+      this.env.timers.clearTimeout(handle);
+      this.tickers.delete(name);
     }
   }
 
@@ -719,7 +773,7 @@ export class AppController {
     const before = this.settings.get().rate;
     const rate = clampRate(before + delta);
     if (rate === before) {
-      this.say(delta > 0 ? "That is the fastest speed." : "That is the slowest speed.");
+      this.notify(delta > 0 ? "That is the fastest speed." : "That is the slowest speed.");
       return;
     }
     this.updateSettings({ rate });
@@ -728,6 +782,10 @@ export class AppController {
 
   /** VoiceOver mode: turn the app's reader on for this document. */
   playWithAppVoice(): void {
+    if (!this.reader.hasContent) {
+      this.say("Wait a moment, I'm still reading the page.");
+      return;
+    }
     this.ui.update({ docAppVoice: true });
     this.reader.play();
   }
@@ -741,12 +799,12 @@ export class AppController {
     const now = this.now();
     if (hasDoc && now > this.newDocumentArmedUntil) {
       this.newDocumentArmedUntil = now + 6000;
-      this.reader.suspend();
-      this.say("Press New document again to clear this document and start a new one.");
+      this.notify("Press New document again to clear this document and start a new one.");
       return;
     }
     this.newDocumentArmedUntil = 0;
-    this.stopAnswer();
+    this.retakeTarget = null;
+    this.teardownAsk();
     this.ask.update({ turns: [], busy: false });
     this.reader.reset();
     this.session.newDocument();
@@ -758,15 +816,46 @@ export class AppController {
 
   addPage(): void {
     if (this.session.awaitingFirstLine) {
-      this.say("Wait a moment, I'm still reading the last page.");
+      this.notify("Wait a moment, I'm still reading the last page.");
+      return;
+    }
+    if (!this.session.doc?.pages.length) {
+      this.notify("Read a page first, then you can add another.");
       return;
     }
     this.reader.suspend();
     void this.openCamera({ addPage: this.session.nextPageNumber });
   }
 
-  /** From the camera (while adding a page), Ask, or Settings. */
+  /**
+   * Whether a page that stopped part way can be photographed again: only the last page, and only
+   * when no other page is still being read (the read that just failed still counts as one).
+   */
+  private canRetake(pageNumber: number): boolean {
+    const pages = this.session.doc?.pages ?? [];
+    return pages[pages.length - 1]?.number === pageNumber && this.session.store.get().activeReads <= 1;
+  }
+
+  /** Photographs again the last page, which could only be read in part. */
+  retakePage(): void {
+    const doc = this.session.doc;
+    const last = doc?.pages[doc.pages.length - 1];
+    if (!last?.failed) {
+      this.notify("Only a page that could not be read completely can be retaken.");
+      return;
+    }
+    if (this.session.isReading) {
+      this.notify("Wait a moment, I'm still reading.");
+      return;
+    }
+    this.reader.suspend();
+    this.retakeTarget = last.number;
+    void this.openCamera({ retake: last.number });
+  }
+
+  /** From the camera (while adding or retaking a page), Ask, or Settings. */
   backToReading(): void {
+    this.retakeTarget = null;
     this.ui.update({ addingPage: null });
     this.navigate("reading");
     this.afterReturnToReading();
@@ -791,7 +880,11 @@ export class AppController {
 
   openAsk(): void {
     if (!this.session.doc?.pages.length) {
-      this.say("Read a page first, then you can ask about it.");
+      this.notify(
+        this.session.awaitingFirstLine
+          ? "Wait a moment, I'm still reading the page. Then you can ask about it."
+          : "Read a page first, then you can ask about it.",
+      );
       return;
     }
     const from = this.ui.get().screen;
@@ -802,13 +895,27 @@ export class AppController {
   }
 
   closeAsk(): void {
+    this.navigate("reading"); // navigate() ends listening and any answer in progress
+    this.afterReturnToReading();
+  }
+
+  /** Ends everything the Ask screen started: listening, speaking, and a streaming answer. */
+  private teardownAsk(): void {
     this.stopListening(true);
     this.stopAnswer();
     this.askAbort?.abort();
     this.askAbort = null;
-    this.ask.update({ busy: false });
-    this.navigate("reading");
-    this.afterReturnToReading();
+    this.stopTicker("answer");
+    this.answerReplay = "none";
+    const turns = this.ask.get().turns;
+    const streaming = turns.some((t) => t.status === "streaming");
+    this.ask.update({
+      busy: false,
+      listening: false,
+      turns: streaming
+        ? turns.map((t) => (t.status === "streaming" ? { ...t, status: "error" as const, error: "Stopped." } : t))
+        : turns,
+    });
   }
 
   /** Stops the answer being spoken (it stays on screen). */
@@ -817,29 +924,52 @@ export class AppController {
     this.answerSpeech = null;
   }
 
-  async submitQuestion(input: string, opts: { spoken?: boolean } = {}): Promise<void> {
+  /**
+   * Sends a question. Returns false when it was not accepted, so the screen keeps what was typed.
+   */
+  submitQuestion(input: string, opts: { spoken?: boolean } = {}): boolean {
     const question = input.trim();
-    const doc = this.session.doc;
     if (!question) {
       this.say("Type or say a question first.");
-      return;
+      return false;
     }
-    if (!doc || this.ask.get().busy) return;
+    if (this.ask.get().busy) {
+      this.say("I'm still answering. Wait a moment, then send your question.");
+      return false;
+    }
+    const doc = this.session.doc;
+    if (!doc?.pages.length) {
+      this.say("Read a page first, then you can ask about it.");
+      return false;
+    }
     const passcode = this.passcode;
     if (!passcode) {
       this.navigate("passcode");
       this.fail("The passcode was not accepted. Please enter it again.");
-      return;
+      return false;
     }
+    // Send pressed while the microphone was still open: the question in the box is the one sent.
+    if (!opts.spoken) this.stopListening(true);
+    void this.runQuestion(question, doc, passcode, opts.spoken === true);
+    return true;
+  }
+
+  private async runQuestion(question: string, doc: Doc, passcode: string, spoken: boolean): Promise<void> {
     this.stopAnswer();
-    const previous = this.ask.get().turns.filter((t) => t.status === "done");
+    this.answerReplay = "none";
+    // The last five questions and answers keep the request small. Failed and empty answers are
+    // left out (the server rejects empty messages).
+    const previous = this.ask
+      .get()
+      .turns.filter((t) => t.status === "done" && t.answer.trim() !== "")
+      .slice(-5);
     const turn: AskTurn = { id: this.nextTurnId++, question, answer: "", status: "streaming" };
     this.ask.update({ turns: [...this.ask.get().turns, turn], busy: true, heard: "" });
     const update = (patch: Partial<AskTurn>) => {
       Object.assign(turn, patch);
       this.ask.update({ turns: [...this.ask.get().turns] });
     };
-    if (opts.spoken) this.say(`You asked: ${question}`);
+    if (spoken) this.say(`You asked: ${question}`);
 
     const speech = this.appVoiceActive
       ? new StreamingSpeech(this.speaker, {
@@ -849,13 +979,16 @@ export class AppController {
         })
       : null;
     this.answerSpeech = speech;
+    // Each message is trimmed to what the server accepts, so one very long answer cannot make
+    // every later question fail.
+    const clip = (text: string) => text.slice(0, ASK_LIMITS.historyContent);
     const history: ChatTurn[] = previous.flatMap((t) => [
-      { role: "user" as const, content: t.question },
-      { role: "assistant" as const, content: t.answer },
+      { role: "user" as const, content: clip(t.question) },
+      { role: "assistant" as const, content: clip(t.answer) },
     ]);
     const abort = new AbortController();
     this.askAbort = abort;
-    this.startLoadingTicker();
+    this.startTicker("answer");
     try {
       await this.env.api.ask(
         { pages: docToAskPages(doc), title: doc.title, history, question },
@@ -863,13 +996,21 @@ export class AppController {
         (event) => {
           if (abort.signal.aborted) return;
           if (event.type === "text") {
-            this.stopLoadingTicker();
+            this.stopTicker("answer");
             update({ answer: turn.answer + event.text });
-            speech?.push(event.text);
+            if (speech && this.answerSpeech === speech) speech.push(event.text);
           } else if (event.type === "done") {
             update({ status: "done" });
-            if (speech) speech.finish();
-            else this.say(`Answer: ${turn.answer.trim()} ${ASK_AGAIN}`);
+            if (this.answerReplay === "whenDone") {
+              this.answerReplay = "none";
+              this.say(`Here is the answer. ${turn.answer.trim()} ${ASK_AGAIN}`);
+            } else if (this.answerReplay === "onReturn") {
+              // The page is hidden; the answer is spoken when the user comes back.
+            } else if (speech && this.answerSpeech === speech) {
+              speech.finish();
+            } else if (!speech) {
+              this.say(`Answer: ${turn.answer.trim()} ${ASK_AGAIN}`);
+            }
           } else {
             update({ status: "error", error: event.message });
             speech?.stop();
@@ -890,9 +1031,13 @@ export class AppController {
       }
       this.fail(spokenError(code, "ask"));
     } finally {
-      this.stopLoadingTicker();
-      if (this.askAbort === abort) this.askAbort = null;
-      this.ask.update({ busy: false });
+      // Only the current question tidies up; one that was stopped earlier must not touch the
+      // ticker or busy state of a question asked after it.
+      if (this.askAbort === abort) {
+        this.stopTicker("answer");
+        this.askAbort = null;
+        this.ask.update({ busy: false });
+      }
     }
   }
 
@@ -906,6 +1051,10 @@ export class AppController {
       this.say("Speaking a question isn't available here. Type it instead; the keyboard's microphone key also works.");
       return;
     }
+    if (this.ask.get().busy) {
+      this.say("I'm still answering. Wait a moment, then ask again.");
+      return;
+    }
     // The app must not talk while the microphone is listening.
     this.stopAnswer();
     this.speaker.cancelAll();
@@ -913,12 +1062,8 @@ export class AppController {
       onText: (text) => this.ask.update({ heard: text }),
       onEnd: (text, error) => {
         this.ask.update({ listening: false });
-        if (this.discardListening) {
-          this.discardListening = false;
-          return;
-        }
         if (text) {
-          void this.submitQuestion(text, { spoken: true });
+          this.submitQuestion(text, { spoken: true });
           return;
         }
         if (error === "not-allowed" || error === "service-not-allowed") {
@@ -936,14 +1081,13 @@ export class AppController {
     this.sounds.tick();
   }
 
-  private discardListening = false;
-
+  /** Stops listening. `discard` drops what was heard; otherwise it is sent as the question. */
   private stopListening(discard: boolean): void {
-    if (!this.listener.active) return;
-    this.discardListening = discard;
-    if (discard) this.listener.abort();
-    else this.listener.stop();
-    this.ask.update({ listening: false });
+    if (this.listener.active) {
+      if (discard) this.listener.abort();
+      else this.listener.stop();
+    }
+    if (this.ask.get().listening) this.ask.update({ listening: false });
   }
 
   // -------------------------------------------------------------------------
@@ -1001,7 +1145,7 @@ export class AppController {
   setVoice(voiceURI: string | null): void {
     this.updateSettings({ voiceURI });
     const voice = this.currentVoice();
-    this.say(voice ? `Voice: ${voice.name}.` : "Voice: automatic.");
+    this.sayUnlessVoiceOver(voice ? `Voice: ${voice.name}.` : "Voice: automatic.");
   }
 
   previewVoice(): void {
@@ -1012,16 +1156,22 @@ export class AppController {
     );
   }
 
-  setRate(rate: number): void {
+  /** `slider`: VoiceOver reads a slider's new value itself, so only the app voice repeats it. */
+  setRate(rate: number, source: "slider" | "button" = "button"): void {
     const next = clampRate(rate);
-    if (next === this.settings.get().rate) return;
+    if (next === this.settings.get().rate) {
+      if (source === "button") this.say(rate > next ? "That is the fastest speed." : "That is the slowest speed.");
+      return;
+    }
     this.updateSettings({ rate: next });
-    this.say(`Speed ${next.toFixed(1)}.`);
+    const text = `Speed ${next.toFixed(1)}.`;
+    if (source === "slider") this.sayUnlessVoiceOver(text);
+    else this.say(text);
   }
 
   setAutoCapture(on: boolean): void {
     this.updateSettings({ autoCapture: on });
-    this.say(on ? "Automatic capture on." : "Automatic capture off. Press Capture to take each picture.");
+    this.sayUnlessVoiceOver(on ? "Automatic capture on." : "Automatic capture off. Press Capture to take each picture.");
   }
 
   setGuidance(guidance: Settings["guidance"]): void {
@@ -1031,7 +1181,7 @@ export class AppController {
 
   setSounds(on: boolean): void {
     this.updateSettings({ sounds: on });
-    this.say(on ? "Sounds on." : "Sounds off.");
+    this.sayUnlessVoiceOver(on ? "Sounds on." : "Sounds off.");
     if (on) this.sounds.tick();
   }
 
@@ -1046,12 +1196,29 @@ export class AppController {
         this.reader.pause({ silent: true });
         this.pausedByHide = true;
       }
+      if (this.ui.get().screen === "ask" && (this.answerSpeech?.active || this.ask.get().busy)) {
+        this.stopAnswer();
+        this.answerReplay = "onReturn";
+      }
       this.speaker.cancelAll();
       return;
     }
     if (this.pausedByHide) {
       this.pausedByHide = false;
       this.say("Paused. Press Play to continue.");
+    }
+    if (this.answerReplay === "onReturn") {
+      const turns = this.ask.get().turns;
+      const last = turns[turns.length - 1];
+      if (last?.status === "done") {
+        this.answerReplay = "none";
+        this.say(`Here is the answer again. ${last.answer.trim()} ${ASK_AGAIN}`);
+      } else if (last?.status === "streaming") {
+        this.answerReplay = "whenDone";
+        this.say("Still answering.");
+      } else {
+        this.answerReplay = "none";
+      }
     }
     // iOS may end the camera track while the page is hidden; restart it. If the track survived,
     // the preview element may still be paused, which would freeze the framing analysis.
@@ -1074,6 +1241,19 @@ function baseLang(tag: string): string {
 function sentence(text: string): string {
   const trimmed = text.trim();
   return trimmed ? trimmed.replace(/[.!?]*$/, ".") : "";
+}
+
+/** What to say when a page stopped part way through. */
+export function partialPageMessage(pageNumber: number, retakeable: boolean, appVoice: boolean): string {
+  const which = retakeable ? "this page" : `page ${pageNumber}`;
+  if (appVoice) {
+    return retakeable
+      ? `I couldn't read the rest of ${which}. Press Play to hear what I have, or Retake page to photograph it again.`
+      : `I couldn't read the rest of ${which}. Press Play to hear what I have.`;
+  }
+  return retakeable
+    ? `I couldn't read the rest of ${which}. The part I read is here. Retake page photographs it again.`
+    : `I couldn't read the rest of ${which}. The part I read is here.`;
 }
 
 function liveTitleAnnouncement(page: DocPage, meta: MetaEvent): string {
