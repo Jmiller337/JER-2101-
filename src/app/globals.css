@@ -15,3 +15,26 @@ body {
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
 }
+
+/* A thick, high-contrast focus ring for keyboard and switch users. */
+:focus-visible {
+  outline: 4px solid #22d3ee;
+  outline-offset: 3px;
+}
+
+/* Programmatic focus on headings (for VoiceOver) should not draw a ring for touch users. */
+h1:focus:not(:focus-visible),
+h2:focus:not(:focus-visible),
+p:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

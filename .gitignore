@@ -28,3 +28,6 @@ npm-debug.log*
 
 # fly.io local state
 .fly/
+
+# generated fake camera videos (tests/e2e/global-setup.ts)
+/tests/fixtures/camera/*.y4m

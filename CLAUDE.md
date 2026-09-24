@@ -17,6 +17,8 @@ Document Reader is a mobile web app that reads paper documents aloud for a blind
 | `npm run fixtures` | Regenerates test images, the fake camera video, and the app icons |
 | `npm run check:real-api` | Sends the test page to the real Anthropic API through the read route. Needs `ANTHROPIC_API_KEY`; costs a few cents |
 
+`FAKE_MODEL=1` makes the server use a scripted model instead of the Anthropic API. The e2e tests set it; never set it on a deployment.
+
 Before every commit: `npm run lint && npm run typecheck && npm test && npm run build`.
 
 ## Stack

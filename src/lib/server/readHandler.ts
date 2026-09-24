@@ -1,0 +1,161 @@
+import { toNdjsonLine } from "@/lib/shared/ndjson";
+import { spokenError } from "@/lib/shared/messages";
+import { ReadRequestSchema, type ReadEvent, type ReadRequest } from "@/lib/shared/protocol";
+import { FALLBACK_BETA, type ModelMessage, type StreamParams } from "./anthropic";
+import { checkRequest } from "./auth";
+import { readJsonBody } from "./body";
+import { LIMITS, type ServerEnv } from "./config";
+import type { HandlerDeps } from "./deps";
+import { classifyModelError, describeError } from "./errors";
+import { jsonResponse, NDJSON_HEADERS } from "./http";
+import { ModelOutputParser } from "./modelOutput";
+import { READ_SYSTEM_PROMPT, readUserText } from "./prompts";
+
+/** The Messages API request for reading one page (PROMPT.md sections 6.5 and 7). */
+export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamParams {
+  return {
+    model: env.readModel,
+    max_tokens: LIMITS.maxTokens,
+    betas: [FALLBACK_BETA],
+    fallbacks: "default",
+    // Transcription needs perception, not deliberation, and latency matters.
+    output_config: { effort: "low" },
+    system: READ_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: [
+          // Image first, then the instruction.
+          {
+            type: "image",
+            source: { type: "base64", media_type: request.image.mediaType, data: request.image.data },
+          },
+          { type: "text", text: readUserText(request.pageNumber, request.languageHint) },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * POST /api/read. Validates the passcode and body, calls the model with streaming, and streams
+ * validated NDJSON events back as they are produced. Always ends the stream with exactly one
+ * `done` or `error` event (unless the phone disconnected).
+ */
+export async function handleRead(req: Request, deps: HandlerDeps): Promise<Response> {
+  const started = deps.now();
+  const elapsed = () => deps.now() - started;
+
+  const denied = checkRequest(req, deps.env);
+  if (denied) {
+    deps.log({ route: "read", outcome: "denied", code: String(denied.status), ms: elapsed() });
+    return denied;
+  }
+  if (!deps.modelConfigured) {
+    deps.log({ route: "read", outcome: "error", code: "not_configured", ms: elapsed() });
+    return jsonResponse(500, { error: "not_configured", message: spokenError("not_configured") });
+  }
+  const body = await readJsonBody(req, LIMITS.maxBodyBytes);
+  if (!body.ok) {
+    deps.log({ route: "read", outcome: "rejected", code: body.error, ms: elapsed() });
+    return jsonResponse(body.status, { error: body.error, message: spokenError(body.error) });
+  }
+  const parsed = ReadRequestSchema.safeParse(body.value);
+  if (!parsed.success) {
+    deps.log({ route: "read", outcome: "rejected", code: "bad_request", ms: elapsed() });
+    return jsonResponse(400, { error: "bad_request", message: spokenError("bad_request") });
+  }
+  const request = parsed.data;
+
+  const abort = new AbortController();
+  req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+  const parser = new ModelOutputParser({ languageHint: request.languageHint });
+  const encoder = new TextEncoder();
+  let firstEventMs: number | null = null;
+
+  const run = async (controller: ReadableStreamDefaultController<Uint8Array>) => {
+    let open = true;
+    const send = (events: ReadEvent[]) => {
+      for (const event of events) {
+        if (!open) return;
+        firstEventMs ??= elapsed();
+        try {
+          controller.enqueue(encoder.encode(toNdjsonLine(event)));
+        } catch {
+          open = false; // the phone went away
+          abort.abort();
+        }
+      }
+    };
+
+    let outcome = "ok";
+    let code: string | undefined;
+    let final: ModelMessage | undefined;
+    try {
+      const stream = deps.client().stream(buildReadParams(deps.env, request), { signal: abort.signal });
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          send(parser.push(event.delta.text));
+        }
+      }
+      final = await stream.finalMessage();
+      if (final.stop_reason === "refusal") {
+        // Every model in the fallback chain declined. Partial text already sent stays sent;
+        // the phone announces the error and stops treating the page as complete.
+        outcome = "refusal";
+        code = "refusal";
+        send(parser.fail("refusal"));
+      } else {
+        send(parser.finish());
+        const status = parser.stats.metaStatus;
+        outcome = status === "retry" ? "retry" : status === "ok" ? "ok" : "empty";
+      }
+    } catch (err) {
+      const classified = classifyModelError(err);
+      if (classified === "aborted" || abort.signal.aborted) {
+        outcome = "aborted";
+      } else {
+        outcome = "error";
+        code = classified;
+        console.error(`read: model call failed: ${describeError(err)}`);
+        send(parser.fail(classified));
+      }
+    } finally {
+      const stats = parser.stats;
+      deps.log({
+        route: "read",
+        outcome,
+        code,
+        model: final?.model ?? deps.env.readModel,
+        ms: elapsed(),
+        firstEventMs,
+        stopReason: final?.stop_reason ?? null,
+        inputTokens: final?.usage.input_tokens,
+        outputTokens: final?.usage.output_tokens,
+        cacheReadTokens: final?.usage.cache_read_input_tokens ?? null,
+        blocks: stats.blocks,
+        dropped: stats.dropped,
+        parserMode: stats.mode,
+        imageChars: request.image.data.length,
+      });
+      if (open) {
+        open = false;
+        try {
+          controller.close();
+        } catch {
+          // already closed by a cancel
+        }
+      }
+    }
+  };
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      void run(controller);
+    },
+    cancel() {
+      abort.abort();
+    },
+  });
+  return new Response(stream, { status: 200, headers: NDJSON_HEADERS });
+}

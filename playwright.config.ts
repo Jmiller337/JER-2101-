@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
-const FAKE_VIDEO = process.env.E2E_FAKE_VIDEO ?? "tests/fixtures/camera/page-into-frame.y4m";
+const FAKE_VIDEO = process.env.E2E_FAKE_VIDEO ?? "tests/fixtures/camera/static-page.y4m";
 
 // Use a preinstalled Chromium when one exists at the conventional path (for example in
 // sandboxed CI images); otherwise Playwright uses the browser from `npx playwright install`.
@@ -14,6 +14,7 @@ const iphone = devices["iPhone 13"];
 
 export default defineConfig({
   testDir: "tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.ts",
   timeout: 90_000,
   expect: { timeout: 20_000 },
   fullyParallel: false,
@@ -48,8 +49,8 @@ export default defineConfig({
       PORT: String(PORT),
       HOSTNAME: "127.0.0.1",
       APP_PASSCODE: "e2e-passcode",
-      // The e2e tests intercept every Anthropic-backed route in the browser, so no real key is used.
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "e2e-no-key",
+      // The server uses the scripted test model: no API key, no cost, real streaming path.
+      FAKE_MODEL: "1",
     },
   },
 });
