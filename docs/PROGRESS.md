@@ -118,5 +118,6 @@ Each can be changed; the reason is given.
 - **Leaving the reading screen** for Settings or Ask pauses silently and resumes on return if it was reading; Add page continues reading page 1 after the capture (Phases 2 and 4).
 - **`/api/ask` streams NDJSON** instead of plain text so an error part-way through can be announced (Phase 4).
 - **Automatic capture fires at most once per visit** to the camera screen and re-arms after a blurry still, a retake, a failed capture, Add page, and New document (Phase 3).
+- **Minimum iOS 16.4** (the spec assumed 16): Next.js 16 and Tailwind CSS v4 both target Safari 16.4 and newer. Any iPhone on iOS 16 can update to 16.4 or later.
 - **Toolchain:** ESLint 9 and TypeScript 5.9 (the newest majors break Next.js's lint plugins), Playwright pinned to 1.56.1 to match the preinstalled browser (Phase 0).
 - **`FAKE_MODEL=1`** exists for tests and dry runs and must never be set on a deployment; the server logs a warning when it is.

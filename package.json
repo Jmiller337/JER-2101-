@@ -6,6 +6,13 @@
   "engines": {
     "node": ">=20.9"
   },
+  "browserslist": [
+    "ios_saf >= 16.4",
+    "safari >= 16.4",
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111"
+  ],
   "scripts": {
     "dev": "next dev",
     "dev:https": "next dev --experimental-https",
