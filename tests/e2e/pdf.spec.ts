@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectAnnounced, expectSpoken, openToCamera, utterances } from "./helpers";
+import { expectAnnounced, expectSpoken, openMore, openToCamera, utterances } from "./helpers";
 
 const PDF = "tests/fixtures/pages/letter.pdf";
 const TITLE = "A two-page letter from Riverside Library about a returned book";
@@ -51,6 +51,7 @@ test("Add page waits until the PDF has been read", async ({ page }) => {
   await page.getByTestId("pdf-input").setInputFiles(PDF);
   await expectSpoken(page, "Got it. Reading the PDF.");
   // The button is marked unavailable while nothing has arrived; a tap still explains why.
+  await openMore(page);
   await page.getByRole("button", { name: "Add page" }).click({ force: true });
   await expectSpoken(page, "Wait a moment, I'm still reading the PDF.");
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toHaveCount(0);

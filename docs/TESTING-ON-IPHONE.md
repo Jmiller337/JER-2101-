@@ -15,7 +15,7 @@ Before starting:
 - [ ] Tapping the bottom half says "Read-aloud mode. I'll read everything to you." then "Enter the passcode, then press Continue."
 - [ ] A wrong passcode says "That passcode is not right. Try again." The right one says "Passcode accepted."
 - [ ] Safari asks for the camera after the app says "I need the camera to see the page. Tap Allow if your phone asks."
-- [ ] The camera preview appears and the app says "Lay the phone flat on the page, then lift it slowly…"
+- [ ] The camera preview appears and the app says "Place the document in range of the camera…"
 
 ## 2. Reading a page
 
@@ -23,14 +23,14 @@ Before starting:
 - [ ] Note roughly how long it took from "Got it. Reading." to the first word of the description: ______ seconds.
 - [ ] Silence never lasts more than about three seconds without a soft tick.
 - [ ] Amounts, dates, and phone numbers are read exactly as printed.
-- [ ] At the end: "End of document. Press Play to hear it again, Ask a question, or Add page."
+- [ ] At the end: "End of document. Press Play to hear it again."
 - [ ] The sentence being read is highlighted in yellow and scrolls into view.
 
 ## 2a. Framing guidance and automatic capture
 
 Hold the phone flat above the page on a table, top of the phone pointing away from you.
 
-- [ ] With nothing under the camera the app says "I can't see a page. Lift the phone slowly."
+- [ ] With nothing under the camera the app says "I can't see a page. Place the document in range of the camera."
 - [ ] Slide the phone so the page is cut off on the left. The app says "Move left." Moving the phone to the left brings the page into view. Repeat for right ("Move right."), top ("Move away from you."), and bottom ("Move toward you."). **If any direction is backwards, write down which.**
 - [ ] Held very close (page overflowing the screen): "Lift the phone higher." Held far away: "Move closer to the page."
 - [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and reads the page. No button press needed.
@@ -56,7 +56,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 
 ## 3a. Several pages
 
-- [ ] After page 1 has finished, press Add page. The camera screen says "Add page 2" and the app says "Page 2. Lay the phone flat on the next page…". After the capture it says "Page 2 added." and reads page 2.
+- [ ] After page 1 has finished, press Add page. The camera screen says "Add page 2" and the app says "Page 2. Place the next page in range of the camera.". After the capture it says "Page 2 added." and reads page 2.
 - [ ] Start a new two-page letter. Press Add page while page 1 is still being read, capture page 2, and check that the app goes back to where it was on page 1, then says "Page 2." at the boundary and reads on.
 - [ ] Pause shows the page: "Paused. Paragraph 2 of 5, page 2 of 2."
 - [ ] Reload the page in Safari (or close and reopen the tab): after Start, the app says "Your document is still here…" and Play reads it.
@@ -94,6 +94,11 @@ Before starting, save a PDF to the iPhone's Files app (for example a bill emaile
 - [ ] "Back to reading" says "Resuming." and continues.
 - [ ] Settings survive closing and reopening Safari.
 
+## 4b. Simple screens
+
+- [ ] While reading, only six buttons show: Back, Play, Forward, New document, Ask a question, More. More shows the rest and VoiceOver says "More, collapsed" or "expanded".
+- [ ] On the camera screen only Capture, Open a PDF, and More show.
+
 ## 4a. Colours and focus
 
 - [ ] Settings, Colours: Light, Dark, and Black and yellow each change the whole app at once and are remembered after closing Safari.
@@ -119,7 +124,7 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] "Play with app voice" starts the app's own reading for this document, and the reading controls appear.
 - [ ] Nothing is announced twice.
 - [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and moving the speed slider reads the new speed once.
-- [ ] On the camera screen, VoiceOver reads the whole "Lay the phone flat on the page…" instruction before the first framing cue.
+- [ ] On the camera screen, VoiceOver reads the whole "Place the document in range of the camera…" instruction before the first framing cue.
 
 ## 7. Hard cases
 

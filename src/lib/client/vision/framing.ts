@@ -149,7 +149,7 @@ export function cueFor(situation: Situation, autoCapture: boolean): string | nul
     case "dark":
       return "Too dark. Turn on a light.";
     case "noPage":
-      return "I can't see a page. Lift the phone slowly.";
+      return "I can't see a page. Place the document in range of the camera.";
     case "tooBig":
       return "Lift the phone higher.";
     case "tooSmall":

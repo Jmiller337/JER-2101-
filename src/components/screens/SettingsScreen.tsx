@@ -48,37 +48,24 @@ export function SettingsScreen() {
         />
       </div>
 
-      <Section id="mode" title="How the app talks to you">
-        <p className="text-xl text-muted">
-          Choose VoiceOver if you use a screen reader: the app stays quiet and VoiceOver reads everything.
-        </p>
-        <Button
-          label="Read aloud (app voice)"
-          aria-pressed={readAloud}
-          variant={readAloud ? "primary" : "secondary"}
-          onClick={() => controller.setMode("readAloud")}
+      <Section id="speed" title="Speed">
+        <label htmlFor="speed" className="text-xl">
+          Reading speed: <span className="font-bold text-accent">{settings.rate.toFixed(1)}</span>
+        </label>
+        <input
+          id="speed"
+          type="range"
+          min={RATE_MIN}
+          max={RATE_MAX}
+          step={RATE_STEP}
+          value={settings.rate}
+          aria-valuetext={`Speed ${settings.rate.toFixed(1)}`}
+          onChange={(event) => controller.setRate(Number(event.target.value), "slider")}
+          className="h-12 w-full"
         />
-        <Button
-          label="VoiceOver (I use a screen reader)"
-          aria-pressed={!readAloud}
-          variant={!readAloud ? "primary" : "secondary"}
-          onClick={() => controller.setMode("voiceOver")}
-        />
-      </Section>
-
-      <Section id="colours" title="Colours">
-        <div className="grid grid-cols-1 gap-3">
-          {(Object.keys(THEME_NAMES) as Theme[]).map((theme) => (
-            <Button
-              key={theme}
-              label={THEME_NAMES[theme]}
-              aria-pressed={settings.theme === theme}
-              icon={<Swatch theme={theme} />}
-              variant={settings.theme === theme ? "primary" : "secondary"}
-              className="justify-start"
-              onClick={() => controller.setTheme(theme)}
-            />
-          ))}
+        <div className="grid grid-cols-2 gap-3">
+          <Button label="Slower" icon={<SlowerIcon />} onClick={() => controller.setRate(settings.rate - RATE_STEP)} />
+          <Button label="Faster" icon={<FasterIcon />} onClick={() => controller.setRate(settings.rate + RATE_STEP)} />
         </div>
       </Section>
 
@@ -117,24 +104,19 @@ export function SettingsScreen() {
         )}
       </Section>
 
-      <Section id="speed" title="Speed">
-        <label htmlFor="speed" className="text-xl">
-          Reading speed: <span className="font-bold text-accent">{settings.rate.toFixed(1)}</span>
-        </label>
-        <input
-          id="speed"
-          type="range"
-          min={RATE_MIN}
-          max={RATE_MAX}
-          step={RATE_STEP}
-          value={settings.rate}
-          aria-valuetext={`Speed ${settings.rate.toFixed(1)}`}
-          onChange={(event) => controller.setRate(Number(event.target.value), "slider")}
-          className="h-12 w-full"
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <Button label="Slower" icon={<SlowerIcon />} onClick={() => controller.setRate(settings.rate - RATE_STEP)} />
-          <Button label="Faster" icon={<FasterIcon />} onClick={() => controller.setRate(settings.rate + RATE_STEP)} />
+      <Section id="colours" title="Colours">
+        <div className="grid grid-cols-1 gap-3">
+          {(Object.keys(THEME_NAMES) as Theme[]).map((theme) => (
+            <Button
+              key={theme}
+              label={THEME_NAMES[theme]}
+              aria-pressed={settings.theme === theme}
+              icon={<Swatch theme={theme} />}
+              variant={settings.theme === theme ? "primary" : "secondary"}
+              className="justify-start"
+              onClick={() => controller.setTheme(theme)}
+            />
+          ))}
         </div>
       </Section>
 
@@ -168,8 +150,22 @@ export function SettingsScreen() {
         <SwitchButton label="Sounds" on={settings.sounds} onToggle={() => controller.setSounds(!settings.sounds)} />
       </Section>
 
-      <Section id="passcode" title="Passcode">
-        <Button label="Forget passcode" onClick={() => controller.forgetPasscode()} />
+      <Section id="mode" title="How the app talks to you">
+        <p className="text-xl text-muted">
+          Choose VoiceOver if you use a screen reader: the app stays quiet and VoiceOver reads everything.
+        </p>
+        <Button
+          label="Read aloud (app voice)"
+          aria-pressed={readAloud}
+          variant={readAloud ? "primary" : "secondary"}
+          onClick={() => controller.setMode("readAloud")}
+        />
+        <Button
+          label="VoiceOver (I use a screen reader)"
+          aria-pressed={!readAloud}
+          variant={!readAloud ? "primary" : "secondary"}
+          onClick={() => controller.setMode("voiceOver")}
+        />
       </Section>
     </main>
   );

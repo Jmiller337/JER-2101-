@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureAndRead, clearUtterances, expectSpoken, openToCamera, setSpeechSpeed, utterances } from "./helpers";
+import { captureAndRead, clearUtterances, expectSpoken, openMore, openToCamera, setSpeechSpeed, utterances } from "./helpers";
 
 test.describe("reading controls", () => {
   test.beforeEach(async ({ page }) => {
@@ -13,6 +13,7 @@ test.describe("reading controls", () => {
     const controls = page.getByRole("navigation", { name: "Reading controls" });
 
     await clearUtterances(page);
+    await openMore(controls);
     await controls.getByRole("button", { name: "Next paragraph" }).click();
     await expectSpoken(page, "Dear Ms. Alvarez, thank you for being a customer.");
 
@@ -50,6 +51,7 @@ test.describe("reading controls", () => {
   });
 
   test("Settings pauses reading, announces changes, and resumes on return", async ({ page }) => {
+    await openMore(page);
     await page.getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     await clearUtterances(page);
@@ -76,6 +78,7 @@ test.describe("reading controls", () => {
     // Settings persist across a reload.
     await page.reload();
     await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
+    await openMore(page);
     await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Reading speed")).toHaveValue("1.4");
@@ -88,6 +91,7 @@ test("at the fastest speed, Faster says so and the reading carries on", async ({
   await captureAndRead(page);
   await expectSpoken(page, "Riverside Water Utility");
   const controls = page.getByRole("navigation", { name: "Reading controls" });
+  await openMore(controls);
   await controls.getByRole("button", { name: /^Faster/ }).click();
   await expectSpoken(page, "That is the fastest speed.");
   await setSpeechSpeed(page, 2);

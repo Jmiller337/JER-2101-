@@ -194,6 +194,14 @@ export const SpeakerIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const MoreIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="5.5" cy="12" r="1.6" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+    <circle cx="18.5" cy="12" r="1.6" fill="currentColor" />
+  </Icon>
+);
+
 export const CheckIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="m5 12.5 4.5 4.5L19 7.5" />

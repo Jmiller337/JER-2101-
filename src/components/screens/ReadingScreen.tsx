@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
-import { AddPageIcon, NewDocumentIcon, PlayIcon, QuestionIcon, RetakeIcon, SettingsIcon } from "../icons";
+import { AddPageIcon, MoreIcon, NewDocumentIcon, PlayIcon, QuestionIcon, RetakeIcon, SettingsIcon } from "../icons";
 import { ReaderControls } from "../ReaderControls";
 import { Transcript } from "../Transcript";
-import { Button } from "../ui";
+import { Button, MoreButton } from "../ui";
 
 /**
  * Screen 2. The transcript as real text. In read-aloud mode (or after "Play with app voice") a
@@ -20,6 +20,7 @@ export function ReadingScreen() {
   const reader = useStore(controller.reader.store);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const [more, setMore] = useState(false);
   useFocusRequest(headingRef, "heading");
   useFocusRequest(headingRef, "transcript");
   useFocusRequest(errorRef, "error");
@@ -83,29 +84,34 @@ export function ReadingScreen() {
               />
             )}
             <Button label="Ask a question" icon={<QuestionIcon />} onClick={() => controller.openAsk()} aria-disabled={!doc} />
-            <Button label="Add page" icon={<AddPageIcon />} onClick={() => controller.addPage()} aria-disabled={!doc} />
             <Button label="New document" icon={<NewDocumentIcon />} onClick={() => controller.newDocument()} />
-            <Button label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+            <MoreButton
+              expanded={more}
+              onToggle={() => setMore((open) => !open)}
+              controls="more-reading-options"
+              icon={<MoreIcon />}
+              size="large"
+            />
+            <div id="more-reading-options" hidden={!more} className="flex flex-col gap-4">
+              <Button label="Add page" icon={<AddPageIcon />} onClick={() => controller.addPage()} aria-disabled={!doc} />
+              <Button label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+            </div>
           </div>
         )}
       </div>
       {appVoice && (
         <ReaderControls
-          extra={
-            <>
-              {retakeNumber !== null && (
-                <Button
-                  label="Retake page"
-                  aria-label={`Retake page ${retakeNumber}`}
-                  icon={<RetakeIcon />}
-                  size="normal"
-                  className="col-span-2"
-                  onClick={() => controller.retakePage()}
-                />
-              )}
-              <Button label="Ask a question" icon={<QuestionIcon />} size="normal" onClick={() => controller.openAsk()} aria-disabled={!doc} />
-              <Button label="Add page" icon={<AddPageIcon />} size="normal" onClick={() => controller.addPage()} aria-disabled={!doc} />
-            </>
+          hasDoc={Boolean(doc)}
+          retake={
+            retakeNumber !== null && (
+              <Button
+                label="Retake page"
+                aria-label={`Retake page ${retakeNumber}`}
+                icon={<RetakeIcon />}
+                size="normal"
+                onClick={() => controller.retakePage()}
+              />
+            )
           }
         />
       )}

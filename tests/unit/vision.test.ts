@@ -182,7 +182,7 @@ describe("CuePolicy", () => {
   it("waits for the situation to hold for two frames", () => {
     const policy = new CuePolicy();
     expect(policy.next({ kind: "noPage" }, 0, full)).toBeNull();
-    expect(policy.next({ kind: "noPage" }, 150, full)).toBe("I can't see a page. Lift the phone slowly.");
+    expect(policy.next({ kind: "noPage" }, 150, full)).toBe("I can't see a page. Place the document in range of the camera.");
   });
 
   it("spaces cues 1.5 seconds apart and suppresses repeats for 4 seconds", () => {
@@ -194,7 +194,7 @@ describe("CuePolicy", () => {
     policy.spoken(first, 100);
     policy.next(noPage, 200, full);
     expect(policy.next(noPage, 300, full)).toBeNull(); // too soon
-    expect(policy.next(noPage, 1700, full)).toBe("I can't see a page. Lift the phone slowly.");
+    expect(policy.next(noPage, 1700, full)).toBe("I can't see a page. Place the document in range of the camera.");
     policy.next(dark, 1800, full);
     expect(policy.next(dark, 2000, full)).toBeNull(); // same cue within 4 s of the last "Too dark"
     expect(policy.next(dark, 4200, full)).toBe("Too dark. Turn on a light.");

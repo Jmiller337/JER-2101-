@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { captureAndRead, expectNoAxeViolations, expectSpoken, openToCamera } from "./helpers";
+import { captureAndRead, expectNoAxeViolations, expectSpoken, openMore, openToCamera } from "./helpers";
 
 test("Settings changes the colours, and the choice survives a reload", async ({ page }) => {
   await openToCamera(page);
   await expect(page.locator("html")).not.toHaveAttribute("data-theme", /dark|contrast/);
+  await openMore(page);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Dark" }).click();
   await expectSpoken(page, "Dark colours.");
@@ -19,6 +20,7 @@ for (const theme of ["dark", "contrast"] as const) {
     await openToCamera(page, "readAloud", { theme });
     await captureAndRead(page);
     await expectNoAxeViolations(page, `reading (${theme})`);
+    await openMore(page);
     await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     await expectNoAxeViolations(page, `settings (${theme})`);

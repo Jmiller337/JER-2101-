@@ -51,7 +51,7 @@ interface PageInfo {
   complete: boolean;
 }
 
-export const END_OF_DOCUMENT = "End of document. Press Play to hear it again, Ask a question, or Add page.";
+export const END_OF_DOCUMENT = "End of document. Press Play to hear it again.";
 
 const ACTIVE: ReadonlySet<ReaderStatus> = new Set(["playing", "waiting", "spelling"]);
 

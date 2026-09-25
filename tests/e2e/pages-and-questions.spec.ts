@@ -4,6 +4,7 @@ import {
   clearUtterances,
   expectAnnounced,
   expectSpoken,
+  openMore,
   openToCamera,
   setSpeechSpeed,
   utterances,
@@ -11,7 +12,7 @@ import {
 
 async function captureSecondPage(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Add page 2" })).toBeVisible();
-  await expectSpoken(page, "Page 2. Lay the phone flat on the next page, then lift it slowly.");
+  await expectSpoken(page, "Page 2. Place the next page in range of the camera.");
   await page.getByRole("button", { name: "Capture" }).click();
   await expect(page.getByTestId("transcript")).toContainText("Ways to pay");
 }
@@ -20,6 +21,7 @@ test("adding a page after the end says 'Page 2 added' and reads it", async ({ pa
   await openToCamera(page);
   await captureAndRead(page);
   await expectSpoken(page, /^End of document\./);
+  await openMore(page);
   await page.getByRole("button", { name: "Add page" }).click();
   await captureSecondPage(page);
   await expectSpoken(page, "Page 2 added.");
@@ -36,6 +38,7 @@ test("adding a page while reading continues page 1, then announces the boundary"
   await setSpeechSpeed(page, 40);
   await captureAndRead(page);
   await expectSpoken(page, "Riverside Water Utility");
+  await openMore(page);
   await page.getByRole("button", { name: "Add page" }).click();
   await setSpeechSpeed(page, 4);
   await captureSecondPage(page);

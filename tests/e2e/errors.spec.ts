@@ -94,7 +94,7 @@ test("a stream cut off mid-page keeps what arrived, and Retake page replaces it"
   await page.unroute("**/api/read");
   await page.getByRole("button", { name: "Retake page 1" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Retake page 1" })).toBeVisible();
-  await expectSpoken(page, "Page 1 again. Lay the phone flat on the page, then lift it slowly.");
+  await expectSpoken(page, "Page 1 again. Place the page in range of the camera.");
   await page.getByRole("button", { name: "Capture" }).click();
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
   await expect(page.getByTestId("transcript")).not.toContainText("The first paragraph arrived.");

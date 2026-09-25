@@ -18,7 +18,7 @@ test("first launch in read-aloud mode: the page is captured automatically and re
   await page.getByLabel("Passcode").fill(PASSCODE);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
-  await expectSpoken(page, /^Lay the phone flat on the page/);
+  await expectSpoken(page, /^Place the document in range of the camera/);
 
   // The fake camera shows a steady, fully visible page: automatic capture fires on its own.
   await expectSpoken(page, "Got it. Reading.");

@@ -84,8 +84,7 @@ export const ASK_AGAIN = "Ask another question, or press Back to reading.";
 export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
 export const CAMERA_PERMISSION_LINE = "I need the camera to see the page. Tap Allow if your phone asks.";
-export const CAMERA_INTRO =
-  "Lay the phone flat on the page, then lift it slowly. I'll tell you when I can see the whole page, or press Capture to take the picture yourself.";
+export const CAMERA_INTRO = "Place the document in range of the camera. I'll take the picture when I can see the page.";
 
 export interface ControllerEnv {
   port: SpeechPort;
@@ -357,13 +356,6 @@ export class AppController {
     }
   }
 
-  forgetPasscode(): void {
-    this.passcode = null;
-    forgetPasscode(this.env.local);
-    this.reader.suspend();
-    this.navigate("passcode");
-    this.say("Passcode forgotten. Enter the passcode, then press Continue.");
-  }
 
   private continueAfterPasscode(): void {
     const doc = this.session.doc;
@@ -564,8 +556,8 @@ export class AppController {
     this.cameraIntroPending = "none";
     const page = this.ui.get().addingPage ?? this.session.nextPageNumber;
     if (intro === "full") this.say(CAMERA_INTRO);
-    else if (intro === "addPage") this.say(`Page ${page}. Lay the phone flat on the next page, then lift it slowly.`);
-    else if (intro === "retake") this.say(`Page ${page} again. Lay the phone flat on the page, then lift it slowly.`);
+    else if (intro === "addPage") this.say(`Page ${page}. Place the next page in range of the camera.`);
+    else if (intro === "retake") this.say(`Page ${page} again. Place the page in range of the camera.`);
   }
 
   /** Without a full-sensor photo, the sharpest of four video frames taken 90 ms apart. */

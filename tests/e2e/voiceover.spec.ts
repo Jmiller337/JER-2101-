@@ -12,7 +12,7 @@ test("VoiceOver mode: status goes to the live region and the app voice stays sil
   await page.getByLabel("Passcode").fill(PASSCODE);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
-  await expectAnnounced(page, /^Lay the phone flat on the page/);
+  await expectAnnounced(page, /^Place the document in range of the camera/);
 
   // Automatic capture (the fake camera shows a steady page).
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();

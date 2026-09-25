@@ -1,32 +1,37 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { AppController } from "@/lib/client/controller";
 import { useController, useStore } from "./hooks";
 import {
+  AddPageIcon,
   FasterIcon,
+  MoreIcon,
   NewDocumentIcon,
   ParagraphDownIcon,
   ParagraphUpIcon,
   PauseIcon,
   PlayIcon,
+  QuestionIcon,
   SettingsIcon,
   SlowerIcon,
   SpellIcon,
   StepBackIcon,
   StepForwardIcon,
 } from "./icons";
-import { Button } from "./ui";
+import { Button, MoreButton } from "./ui";
 
 /**
- * The fixed control bar for read-aloud mode (PROMPT.md screen 2). Every control is a native
- * button with a visible label; short labels get a fuller accessible name that still contains the
- * visible text (WCAG 2.5.3).
+ * The fixed control bar for read-aloud mode (PROMPT.md screen 2). It starts with only the core
+ * controls: Back, Play or Pause, Forward, New document, Ask a question, and More, which shows the
+ * rest. Every control is a native button with a visible label; short labels get a fuller
+ * accessible name that still contains the visible text (WCAG 2.5.3).
  */
-export function ReaderControls({ extra }: { extra?: React.ReactNode }) {
+export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; hasDoc: boolean }) {
   const controller = useController();
   const reader = useStore(controller.reader.store);
   const settings = useStore(controller.settings);
+  const [more, setMore] = useState(false);
   const active = reader.status === "playing" || reader.status === "waiting" || reader.status === "spelling";
   useReadingShortcuts(controller);
 
@@ -64,31 +69,51 @@ export function ReaderControls({ extra }: { extra?: React.ReactNode }) {
           onClick={() => controller.forward()}
         />
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" onClick={() => controller.previousParagraph()} />
-        <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" onClick={() => controller.nextParagraph()} />
-      </div>
+      {retake && <div className="mt-2 grid">{retake}</div>}
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" onClick={() => controller.spell()} />
+        <Button label="New document" icon={<NewDocumentIcon />} layout="stacked" size="normal" onClick={() => controller.newDocument()} />
         <Button
-          label="Slower"
-          aria-label={`Slower, speed ${settings.rate.toFixed(1)}`}
-          icon={<SlowerIcon />}
+          label="Ask a question"
+          icon={<QuestionIcon />}
+          layout="stacked"
           size="normal"
-          onClick={() => controller.slower()}
+          onClick={() => controller.openAsk()}
+          aria-disabled={!hasDoc}
         />
-        <Button
-          label="Faster"
-          aria-label={`Faster, speed ${settings.rate.toFixed(1)}`}
-          icon={<FasterIcon />}
-          size="normal"
-          onClick={() => controller.faster()}
+        <MoreButton
+          expanded={more}
+          onToggle={() => setMore((open) => !open)}
+          controls="more-reading-controls"
+          icon={<MoreIcon />}
+          className="flex-col gap-1 py-2"
         />
       </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        {extra}
-        <Button label="New document" icon={<NewDocumentIcon />} size="normal" onClick={() => controller.newDocument()} />
-        <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
+      <div id="more-reading-controls" hidden={!more} className="mt-2 flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" onClick={() => controller.previousParagraph()} />
+          <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" onClick={() => controller.nextParagraph()} />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" onClick={() => controller.spell()} />
+          <Button
+            label="Slower"
+            aria-label={`Slower, speed ${settings.rate.toFixed(1)}`}
+            icon={<SlowerIcon />}
+            size="normal"
+            onClick={() => controller.slower()}
+          />
+          <Button
+            label="Faster"
+            aria-label={`Faster, speed ${settings.rate.toFixed(1)}`}
+            icon={<FasterIcon />}
+            size="normal"
+            onClick={() => controller.faster()}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button label="Add page" icon={<AddPageIcon />} size="normal" onClick={() => controller.addPage()} aria-disabled={!hasDoc} />
+          <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
+        </div>
       </div>
     </nav>
   );

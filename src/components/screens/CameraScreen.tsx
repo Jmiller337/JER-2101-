@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
-import { BackIcon, CameraIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
-import { Button } from "../ui";
+import { BackIcon, CameraIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
+import { Button, MoreButton } from "../ui";
 
 const CORNERS = [
   "left-0 top-0 rounded-tl-xl border-l-4 border-t-4",
@@ -22,12 +22,12 @@ const PAGE_RATIO = 8.5 / 11;
 export function CameraScreen() {
   const controller = useController();
   const ui = useStore(controller.ui);
-  const settings = useStore(controller.settings);
   const lastMessage = useStore(controller.announcer.lastMessage);
   const session = useStore(controller.session.store);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
+  const [more, setMore] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useFocusRequest(headingRef, "heading");
@@ -59,16 +59,13 @@ export function CameraScreen() {
       {/* Darkens the top and bottom so the text reads over any picture, in every theme. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-b from-scrim/75 via-transparent to-scrim/85" />
       <div className="relative z-10 flex h-full flex-col gap-3 p-4">
-        <div className="flex shrink-0 items-center justify-between gap-3">
-          <h1 ref={headingRef} tabIndex={-1} className="rounded-2xl bg-scrim/85 px-4 py-1.5 text-3xl font-extrabold tracking-tight text-on-scrim">
-            {ui.cameraTitle}
-          </h1>
-          {!cameraFailed && (
-            <p className="shrink-0 rounded-full bg-scrim/85 px-3 py-1.5 text-base font-semibold text-on-scrim">
-              {settings.autoCapture ? "Auto capture on" : "Press Capture"}
-            </p>
-          )}
-        </div>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="shrink-0 self-start rounded-2xl bg-scrim/85 px-4 py-1.5 text-3xl font-extrabold tracking-tight text-on-scrim"
+        >
+          {ui.cameraTitle}
+        </h1>
         {/* The status line may be clipped on a short screen; it is spoken anyway, and the
             Capture button must never be pushed off the bottom. */}
         <p
@@ -100,9 +97,12 @@ export function CameraScreen() {
             {docInProgress && (
               <Button label="Back to reading" icon={<BackIcon />} size="normal" onClick={() => controller.backToReading()} />
             )}
-            <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
             <Button label="Open a PDF" icon={<PdfIcon />} size="normal" onClick={openPdfPicker} />
+            <MoreButton expanded={more} onToggle={() => setMore((open) => !open)} controls="more-camera-options" icon={<MoreIcon />} />
+          </div>
+          <div id="more-camera-options" hidden={!more} className="flex flex-wrap gap-2">
             {!cameraFailed && <Button label="Use phone camera instead" icon={<PhotoIcon />} size="normal" onClick={openPhoneCamera} />}
+            <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
           </div>
           {/* The iPhone's own camera app: works in other apps' browsers and when the live
               preview fails. Its controls are labelled for VoiceOver. */}

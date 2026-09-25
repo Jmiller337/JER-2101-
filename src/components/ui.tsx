@@ -65,3 +65,36 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     </button>
   );
 });
+
+/**
+ * Shows or hides the less-used controls of a screen, so each screen starts with only its core
+ * controls. VoiceOver reads it as "More, collapsed" or "More, expanded".
+ */
+export function MoreButton({
+  expanded,
+  onToggle,
+  controls,
+  icon,
+  size = "normal",
+  className = "",
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  /** Id of the element the button shows and hides. */
+  controls: string;
+  icon: ReactNode;
+  size?: Size;
+  className?: string;
+}) {
+  return (
+    <Button
+      label="More"
+      aria-expanded={expanded}
+      aria-controls={controls}
+      icon={icon}
+      size={size}
+      className={className}
+      onClick={onToggle}
+    />
+  );
+}

@@ -140,6 +140,15 @@ The owner asked for better reading in poor conditions, using reasoning to fill g
 - **Better photos.** Photos go up at 2576 pixels on the long edge instead of 2000, the most detail the model uses, which helps small print. On iPhones without full-sensor photos in the browser (before iOS 18.4), the app takes four frames 90 ms apart and sends the sharpest, so one shaky moment does not spoil the picture. Dim photos and faded receipts get a simple brightness stretch (at most 2.5 times, no sharpening or thresholding); well exposed photos are sent as they are.
 - **Not verified.** None of this has been tried with the real model on real hard photos. The iPhone checklist has new items for dim light, a crumpled page, and a faded receipt.
 
+## Simpler screens
+
+The owner asked to hone in on simplicity. Nothing was removed; the less-used controls moved behind one "More" button.
+
+- **Reading:** Back, Play or Pause, Forward, New document, Ask a question, and More. More shows Previous and Next paragraph, Spell, Slower, Faster, Add page, and Settings. In VoiceOver mode the list below the text is Play with app voice, Ask a question, New document, and More (Add page, Settings). Retake page still appears on its own when a page stopped part way.
+- **Camera:** Capture, Open a PDF, and More (Use phone camera instead, Settings). The small "Auto capture on" label is gone.
+- **Passcode:** just the field and Continue. **Settings:** the most used sections first (Speed, Voice, Colours, Camera, Sounds, How the app talks to you); "Forget passcode" is gone, because the app already asks again when the passcode changes on the server.
+- **Words:** the camera now says "Place the document in range of the camera. I'll take the picture when I can see the page." (the owner's wording), Add page says "Page 2. Place the next page in range of the camera.", and the end of a document is simply "End of document. Press Play to hear it again." The direction cues ("Move left", "Move away from you") still assume the phone is held above a page on a table.
+
 ## What still needs the owner
 
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).

@@ -2,8 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
-import { LockIcon, SettingsIcon } from "../icons";
-import { Button } from "../ui";
+import { LockIcon } from "../icons";
 
 export function PasscodeScreen() {
   const controller = useController();
@@ -57,7 +56,6 @@ export function PasscodeScreen() {
           {passcodeBusy ? "Checking…" : "Continue"}
         </button>
       </form>
-      <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} className="self-start" />
     </main>
   );
 }

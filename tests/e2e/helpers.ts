@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { installFakeSpeech } from "./fakeSpeech";
 
 export const PASSCODE = "e2e-passcode";
@@ -151,4 +151,11 @@ export function cameraVideo(name: string) {
       "--autoplay-policy=no-user-gesture-required",
     ],
   };
+}
+
+/** Shows the less-used controls behind "More" on the current screen (or inside `scope`). */
+export async function openMore(scope: Page | Locator) {
+  const button = scope.getByRole("button", { name: "More" });
+  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  await expect(button).toHaveAttribute("aria-expanded", "true");
 }
