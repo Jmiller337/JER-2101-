@@ -84,7 +84,7 @@ export const ASK_AGAIN = "Ask another question, or press Back to reading.";
 export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
 export const CAMERA_PERMISSION_LINE = "I need the camera to see the page. Tap Allow if your phone asks.";
-export const CAMERA_INTRO = "Place the document in range of the camera. I'll take the picture when I can see the page.";
+export const CAMERA_INTRO = "Camera ready.";
 
 export interface ControllerEnv {
   port: SpeechPort;
@@ -556,8 +556,8 @@ export class AppController {
     this.cameraIntroPending = "none";
     const page = this.ui.get().addingPage ?? this.session.nextPageNumber;
     if (intro === "full") this.say(CAMERA_INTRO);
-    else if (intro === "addPage") this.say(`Page ${page}. Place the next page in range of the camera.`);
-    else if (intro === "retake") this.say(`Page ${page} again. Place the page in range of the camera.`);
+    else if (intro === "addPage") this.say(`Add page ${page}.`);
+    else if (intro === "retake") this.say(`Retake page ${page}.`);
   }
 
   /** Without a full-sensor photo, the sharpest of four video frames taken 90 ms apart. */

@@ -2,22 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
-import { BackIcon, CameraIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
+import { BackIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
 import { Button, MoreButton } from "../ui";
 
-const CORNERS = [
-  "left-0 top-0 rounded-tl-xl border-l-4 border-t-4",
-  "right-0 top-0 rounded-tr-xl border-r-4 border-t-4",
-  "bottom-0 left-0 rounded-bl-xl border-b-4 border-l-4",
-  "bottom-0 right-0 rounded-br-xl border-b-4 border-r-4",
-];
-
-/** A letter-sized page is 8.5 by 11 inches: the guide has the same upright shape. */
-const PAGE_RATIO = 8.5 / 11;
-
 /**
- * Screen 1. Full-screen preview (hidden from VoiceOver: there is nothing useful to describe),
- * a large status line showing the current cue, and a huge Capture button across the bottom third.
+ * Screen 1, the capture screen. The live picture is the content and fills the screen; the
+ * controls float above it on dark glass: a short status line, More (Open a PDF, the phone's own
+ * camera, Settings), and one large Capture panel across the bottom. The preview is hidden from
+ * VoiceOver: there is nothing useful to describe.
  */
 export function CameraScreen() {
   const controller = useController();
@@ -27,9 +19,9 @@ export function CameraScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
-  const [more, setMore] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const [more, setMore] = useState(false);
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
 
@@ -44,9 +36,10 @@ export function CameraScreen() {
   const cameraFailed = ui.cameraStatus === "error";
   const openPhoneCamera = () => fileRef.current?.click();
   const openPdfPicker = () => pdfRef.current?.click();
+  const status = ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage;
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-ink text-text">
+    <main className="relative h-dvh overflow-hidden bg-black text-on-scrim">
       <video
         ref={videoRef}
         aria-hidden="true"
@@ -56,109 +49,123 @@ export function CameraScreen() {
         autoPlay
         className="absolute inset-0 h-full w-full object-cover"
       />
-      {/* Darkens the top and bottom so the text reads over any picture, in every theme. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-linear-to-b from-scrim/75 via-transparent to-scrim/85" />
-      <div className="relative z-10 flex h-full flex-col gap-3 p-4">
-        <h1
-          ref={headingRef}
-          tabIndex={-1}
-          className="shrink-0 self-start rounded-2xl bg-scrim/85 px-4 py-1.5 text-3xl font-extrabold tracking-tight text-on-scrim"
-        >
-          {ui.cameraTitle}
-        </h1>
-        {/* The status line may be clipped on a short screen; it is spoken anyway, and the
-            Capture button must never be pushed off the bottom. */}
-        <p
-          className="min-h-0 shrink overflow-hidden rounded-2xl bg-scrim/85 px-4 py-3 text-2xl font-bold leading-snug text-on-scrim"
-          data-testid="camera-status"
-        >
-          {ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage}
-        </p>
-        {ui.errorText && (
-          <p ref={errorRef} tabIndex={-1} className="rounded-2xl bg-scrim/85 px-4 py-3 text-lg font-semibold text-highlight">
-            {ui.errorText}
-          </p>
-        )}
-        {/* A page-shaped guide, as large as fits in the space between the status and the buttons. */}
-        <div aria-hidden="true" className="flex min-h-0 flex-1 items-center justify-center" style={{ containerType: "size" }}>
-          {!cameraFailed && (
-            <div
-              className="relative drop-shadow-[0_0_3px_rgba(0,0,0,0.85)]"
-              style={{ width: `min(100cqw, ${PAGE_RATIO} * 100cqh)`, aspectRatio: `${PAGE_RATIO}` }}
-            >
-              {CORNERS.map((corner) => (
-                <span key={corner} className={`absolute h-9 w-9 border-white ${corner}`} />
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {docInProgress && (
-              <Button label="Back to reading" icon={<BackIcon />} size="normal" onClick={() => controller.backToReading()} />
-            )}
-            <Button label="Open a PDF" icon={<PdfIcon />} size="normal" onClick={openPdfPicker} />
-            <MoreButton expanded={more} onToggle={() => setMore((open) => !open)} controls="more-camera-options" icon={<MoreIcon />} />
-          </div>
-          <div id="more-camera-options" hidden={!more} className="flex flex-wrap gap-2">
-            {!cameraFailed && <Button label="Use phone camera instead" icon={<PhotoIcon />} size="normal" onClick={openPhoneCamera} />}
-            <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
-          </div>
-          {/* The iPhone's own camera app: works in other apps' browsers and when the live
-              preview fails. Its controls are labelled for VoiceOver. */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="hidden"
-            data-testid="phone-camera-input"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void controller.captureFromFile(file);
-            }}
-          />
-          {/* A PDF from the Files app, iCloud Drive, or a mail attachment saved to Files. */}
-          <input
-            ref={pdfRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="hidden"
-            data-testid="pdf-input"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void controller.openPdf(file);
-            }}
-          />
-          {cameraFailed ? (
-            <button
-              type="button"
-              onClick={openPhoneCamera}
-              aria-disabled={ui.capturing}
-              className="flex h-[33dvh] min-h-28 w-full flex-col items-center justify-center gap-2 rounded-card border-2 border-accent bg-accent px-4 text-4xl font-extrabold tracking-tight text-on-accent active:scale-[0.99]"
-            >
-              <PhotoIcon className="h-12 w-12" />
-              {ui.capturing ? "Reading the photo…" : "Use phone camera instead"}
-            </button>
+      <div className="relative z-10 flex h-full flex-col">
+        <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+          {/* The screen's name for VoiceOver; sighted users see the picture itself. */}
+          <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+            {ui.cameraTitle}
+          </h1>
+          {docInProgress ? (
+            <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" className="rounded-full" onClick={() => controller.backToReading()} />
           ) : (
-            <button
-              type="button"
-              onClick={() => void controller.captureManual()}
-              aria-disabled={ui.capturing}
-              className="flex h-[33dvh] min-h-28 w-full flex-col items-center justify-center gap-2 rounded-card border-2 border-accent bg-accent text-5xl font-extrabold tracking-tight text-on-accent active:scale-[0.99]"
+            <span />
+          )}
+          <div className="flex flex-col items-end gap-2">
+            <MoreButton
+              expanded={more}
+              onToggle={() => setMore((open) => !open)}
+              controls="more-camera-options"
+              icon={<MoreIcon />}
+              variant="glass"
+              className="rounded-full"
+            />
+            <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
+              <MenuItem label="Open a PDF" icon={<PdfIcon />} onClick={openPdfPicker} />
+              {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
+              <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
+          {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
+          {status && (
+            <p
+              className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
+              data-testid="camera-status"
             >
-              <CameraIcon className="h-14 w-14" />
-              {ui.capturing ? "Capturing…" : "Capture"}
-            </button>
+              {status}
+            </p>
+          )}
+          {ui.errorText && (
+            <p ref={errorRef} tabIndex={-1} className="glass-dark max-w-full rounded-3xl px-5 py-2 text-center text-xl font-semibold text-highlight">
+              {ui.errorText}
+            </p>
           )}
         </div>
+
+        {/* The iPhone's own camera app: works in other apps' browsers and when the live preview
+            fails. And a PDF from Files, iCloud Drive, or a mail attachment saved to Files. */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="hidden"
+          data-testid="phone-camera-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void controller.captureFromFile(file);
+          }}
+        />
+        <input
+          ref={pdfRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="hidden"
+          data-testid="pdf-input"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void controller.openPdf(file);
+          }}
+        />
+
+        {/* The one primary action: the whole bottom panel is the button. */}
+        <button
+          type="button"
+          onClick={cameraFailed ? openPhoneCamera : () => void controller.captureManual()}
+          aria-disabled={ui.capturing}
+          className="glass-dark group flex h-[30dvh] min-h-36 w-full shrink-0 flex-col items-center justify-center gap-3 rounded-t-[2rem] border-2 border-b-0 border-button-border pb-[env(safe-area-inset-bottom)] text-on-scrim"
+        >
+          {cameraFailed ? (
+            <PhotoIcon className="h-14 w-14" />
+          ) : (
+            <span aria-hidden="true" className={`block h-20 w-20 rounded-full border-4 border-white p-1.5 ${ui.capturing ? "opacity-50" : ""}`}>
+              <span className="block h-full w-full rounded-full bg-white transition-transform duration-150 group-active:scale-90" />
+            </span>
+          )}
+          <span className="text-3xl font-bold tracking-tight">
+            {cameraFailed
+              ? ui.capturing
+                ? "Reading the photo…"
+                : "Use phone camera instead"
+              : ui.capturing
+                ? "Capturing…"
+                : "Capture"}
+          </span>
+        </button>
       </div>
     </main>
+  );
+}
+
+function MenuItem({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-14 items-center gap-3 border-b border-white/15 px-4 text-left text-xl font-semibold text-on-scrim last:border-b-0 active:bg-white/10"
+    >
+      <span aria-hidden="true" className="h-6 w-6 shrink-0 [&>svg]:h-full [&>svg]:w-full">
+        {icon}
+      </span>
+      {label}
+    </button>
   );
 }

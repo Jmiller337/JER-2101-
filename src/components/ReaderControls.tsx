@@ -38,7 +38,7 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
   return (
     <nav
       aria-label="Reading controls"
-      className="sticky bottom-0 border-t border-line bg-surface/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
+      className="glass sticky bottom-2 mx-2 mb-2 rounded-[1.75rem] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
         <Button
@@ -71,7 +71,14 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
       </div>
       {retake && <div className="mt-2 grid">{retake}</div>}
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button label="New document" icon={<NewDocumentIcon />} layout="stacked" size="normal" onClick={() => controller.newDocument()} />
+        <Button
+          label="New document"
+          icon={<NewDocumentIcon />}
+          layout="stacked"
+          size="normal"
+          variant="destructive"
+          onClick={() => controller.newDocument()}
+        />
         <Button
           label="Ask a question"
           icon={<QuestionIcon />}

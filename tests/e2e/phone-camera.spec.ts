@@ -24,7 +24,7 @@ test("when the camera is refused, the phone camera becomes the main button", asy
   await expect(fallback).toBeVisible();
   const box = await fallback.boundingBox();
   expect(box!.height).toBeGreaterThan(150);
-  expect((await announcements(page)).filter((a) => a.includes("Place the document in range"))).toEqual([]);
+  expect((await announcements(page)).filter((a) => a.includes("Camera ready"))).toEqual([]);
 });
 
 test("inside another app's browser, it asks for Safari", async ({ page }) => {

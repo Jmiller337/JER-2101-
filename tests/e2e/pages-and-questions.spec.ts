@@ -12,7 +12,7 @@ import {
 
 async function captureSecondPage(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Add page 2" })).toBeVisible();
-  await expectSpoken(page, "Page 2. Place the next page in range of the camera.");
+  await expectSpoken(page, "Add page 2.");
   await page.getByRole("button", { name: "Capture" }).click();
   await expect(page.getByTestId("transcript")).toContainText("Ways to pay");
 }
@@ -70,7 +70,7 @@ test("asking a question speaks the answer and keeps it on screen", async ({ page
   await expectSpoken(page, /^The phone number is 555-0142/);
   await expect(page.getByTestId("answers").getByRole("listitem")).toHaveCount(2);
 
-  await page.getByRole("button", { name: "Back to reading" }).click();
+  await page.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("navigation", { name: "Reading controls" })).toBeVisible();
 });
 

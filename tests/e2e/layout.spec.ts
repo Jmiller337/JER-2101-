@@ -8,7 +8,7 @@ for (const viewport of [
   test(`the Capture button is fully visible on a ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await openToCamera(page);
-    await expect(page.getByTestId("camera-status")).toContainText("Place the document in range");
+    await expect(page.getByTestId("camera-status")).toContainText("Camera ready");
     const box = await page.getByRole("button", { name: "Capture" }).boundingBox();
     expect(box).not.toBeNull();
     expect(box!.y).toBeGreaterThanOrEqual(0);

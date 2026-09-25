@@ -6,6 +6,7 @@ const TITLE = "A two-page letter from Riverside Library about a returned book";
 
 test("a PDF from the phone's files is read aloud, every page, in order", async ({ page }) => {
   await openToCamera(page);
+  await openMore(page);
   await expect(page.getByRole("button", { name: "Open a PDF" })).toBeVisible();
   await page.getByTestId("pdf-input").setInputFiles(PDF);
   await expectSpoken(page, "Got it. Reading the PDF.");

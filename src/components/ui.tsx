@@ -2,15 +2,25 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "quiet";
+type Variant = "primary" | "secondary" | "destructive" | "plain" | "glass";
 type Size = "huge" | "large" | "normal";
 
+/*
+ * Button styles, after the iOS button styles. No borders or shadows: a filled accent button for
+ * the one primary action, tinted fills for everything else. Borders appear only in the Black and
+ * yellow theme and with Increase Contrast (--color-button-border).
+ */
 const VARIANTS: Record<Variant, string> = {
-  // Near-black on amber: about 13:1.
-  primary: "bg-accent text-on-accent border-2 border-accent",
-  // Off-white on slate: about 14:1.
-  secondary: "bg-surface-2 text-text border-2 border-line-2",
-  quiet: "bg-transparent text-text border-2 border-line",
+  // Filled: the one primary action on a screen.
+  primary: "bg-accent text-on-accent",
+  // Tinted grey fill.
+  secondary: "bg-surface-2 text-text",
+  // Destructive: red label, never next to the primary action.
+  destructive: "bg-surface-2 text-danger",
+  // A text button, like Done in a navigation bar.
+  plain: "bg-transparent text-accent",
+  // Over the live camera picture.
+  glass: "glass-dark text-on-scrim",
 };
 
 const SIZES: Record<Size, string> = {
@@ -51,7 +61,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type="button"
-      className={`inline-flex touch-manipulation items-center justify-center rounded-2xl font-bold leading-tight tracking-tight select-none ${
+      className={`inline-flex touch-manipulation items-center justify-center rounded-2xl border-2 border-button-border font-semibold leading-tight select-none ${
         layout === "stacked" ? "flex-col gap-1 py-2" : "gap-2.5"
       } ${VARIANTS[variant]} ${SIZES[size]} ${unavailable ? "opacity-60" : "transition-transform active:scale-[0.98]"} ${className}`}
       {...rest}
@@ -76,6 +86,7 @@ export function MoreButton({
   controls,
   icon,
   size = "normal",
+  variant = "secondary",
   className = "",
 }: {
   expanded: boolean;
@@ -84,6 +95,7 @@ export function MoreButton({
   controls: string;
   icon: ReactNode;
   size?: Size;
+  variant?: Variant;
   className?: string;
 }) {
   return (
@@ -93,8 +105,32 @@ export function MoreButton({
       aria-controls={controls}
       icon={icon}
       size={size}
+      variant={variant}
       className={className}
       onClick={onToggle}
     />
+  );
+}
+
+/**
+ * The navigation bar of a modal screen (Settings, Ask): the screen's title on the leading side
+ * and Done on the trailing side, on glass that floats above the scrolling content.
+ */
+export function NavBar({
+  title,
+  headingRef,
+  onDone,
+}: {
+  title: string;
+  headingRef: React.Ref<HTMLHeadingElement>;
+  onDone: () => void;
+}) {
+  return (
+    <header className="glass sticky top-0 z-20 flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+      <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold tracking-tight">
+        {title}
+      </h1>
+      <Button label="Done" variant="plain" size="normal" className="shrink-0 px-3 text-2xl font-bold" onClick={onDone} />
+    </header>
   );
 }

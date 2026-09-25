@@ -41,7 +41,7 @@ export function Transcript({ doc, version, current, plain }: TranscriptProps) {
       {pages.map((page) => (
         <section key={page.number} className="flex flex-col gap-4">
           {pages.length > 1 && (
-            <h2 className="self-start rounded-full border border-accent/60 bg-accent-soft px-4 py-1 text-xl font-bold text-accent">
+            <h2 className="border-t border-line pt-6 text-xl font-semibold text-muted">
               Page {page.number}
             </h2>
           )}
@@ -96,7 +96,7 @@ function renderBlocks(
       case "table_row":
       case "label_value":
         out.push(
-          <p key={key} className="border-l-4 border-accent/60 pl-3 text-2xl">
+          <p key={key} className="border-l-4 border-line pl-3 text-2xl">
             {content}
           </p>,
         );

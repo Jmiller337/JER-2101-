@@ -1,30 +1,37 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. The default theme is Light; Dark and Black and yellow override the same
- * variables under [data-theme]. Every text colour pairs with its background at 7:1 or better
- * (principle 8), checked for all three themes:
- *   Light: text on page 16.4, muted on card 9.7, white on blue 9.5, blue on page 8.6.
- *   Dark: text on page 19.3, muted on card 10.9, button text 9.8, blue on page 11.5.
- *   Black and yellow: text on page 21, black on yellow 16.6, yellow on page 16.6.
+ * Design tokens, named after their iOS counterparts (see docs/DESIGN.md). Light is the base;
+ * Dark applies when the theme is Dark, or Automatic with the iPhone in dark mode; Black and
+ * yellow is the high-contrast theme. Every text colour pairs with its background at 7:1 or
+ * better in every theme (principle 8, stricter than the 4.5:1 platform minimum).
+ *
+ *   ink        systemBackground            grouped   systemGroupedBackground
+ *   surface    secondarySystemGroupedBg    surface-2 tertiarySystemFill (tinted buttons)
+ *   text       label                        muted     secondaryLabel (darkened to 7:1)
+ *   line       separator                    bar       the tint under glass
  */
 @theme {
-  --color-ink: #f4f4f0;
+  --color-ink: #ffffff;
+  --color-grouped: #f2f2f7;
   --color-surface: #ffffff;
-  --color-surface-2: #eeeee9;
-  --color-surface-3: #e0e0d9;
-  --color-line: #d4d4cc;
-  --color-line-2: #8a8a80;
-  --color-text: #15161a;
-  --color-muted: #43444c;
-  --color-accent: #1d3d9e;
+  --color-surface-2: #e8e8ed;
+  --color-surface-3: #dcdce2;
+  --color-line: #c6c6c8;
+  --color-line-2: #8a8a8e;
+  --color-button-border: transparent;
+  --color-text: #000000;
+  --color-muted: #3c3c43;
+  --color-accent: #0035c8;
   --color-on-accent: #ffffff;
-  --color-accent-soft: #e5eafa;
+  --color-accent-soft: #eef2ff;
+  --color-danger: #9a0019;
   --color-highlight: #ffe066;
-  --color-on-highlight: #15161a;
+  --color-on-highlight: #000000;
   --color-focus: #c2410c;
-  /* Always dark, whatever the theme: chips over the live camera picture. */
-  --color-scrim: #0d0e12;
+  --color-bar: #f9f9f9;
+  /* Always dark, whatever the theme: glass over the live camera picture. */
+  --color-scrim: #141416;
   --color-on-scrim: #ffffff;
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -36,40 +43,79 @@
   color-scheme: light;
 }
 
+/* Dark: chosen in Settings, or Automatic with the iPhone in dark mode. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-ink: #000000;
-  --color-surface: #141416;
-  --color-surface-2: #1f1f23;
-  --color-surface-3: #2c2c31;
-  --color-line: #2e2e34;
-  --color-line-2: #707079;
-  --color-text: #f5f5f7;
-  --color-muted: #c7c7cd;
-  --color-accent: #9cc1ff;
-  --color-on-accent: #051733;
-  --color-accent-soft: #15213a;
+  --color-grouped: #000000;
+  --color-surface: #1c1c1e;
+  --color-surface-2: #2c2c2e;
+  --color-surface-3: #3a3a3c;
+  --color-line: #38383a;
+  --color-line-2: #8e8e93;
+  --color-text: #ffffff;
+  --color-muted: #d1d1d6;
+  --color-accent: #8cc4ff;
+  --color-on-accent: #000000;
+  --color-accent-soft: #0f2540;
+  --color-danger: #ffa3a3;
   --color-highlight: #ffe066;
   --color-on-highlight: #000000;
   --color-focus: #ffb86b;
+  --color-bar: #1c1c1e;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-ink: #000000;
+    --color-grouped: #000000;
+    --color-surface: #1c1c1e;
+    --color-surface-2: #2c2c2e;
+    --color-surface-3: #3a3a3c;
+    --color-line: #38383a;
+    --color-line-2: #8e8e93;
+    --color-text: #ffffff;
+    --color-muted: #d1d1d6;
+    --color-accent: #8cc4ff;
+    --color-on-accent: #000000;
+    --color-accent-soft: #0f2540;
+    --color-danger: #ffa3a3;
+    --color-highlight: #ffe066;
+    --color-on-highlight: #000000;
+    --color-focus: #ffb86b;
+    --color-bar: #1c1c1e;
+  }
+}
+
+/* Black and yellow: the classic high-contrast scheme, with outlined buttons. */
 :root[data-theme="contrast"] {
   color-scheme: dark;
   --color-ink: #000000;
+  --color-grouped: #000000;
   --color-surface: #0a0a0a;
-  --color-surface-2: #161616;
+  --color-surface-2: #1a1a1a;
   --color-surface-3: #262626;
   --color-line: #404040;
   --color-line-2: #ffffff;
+  --color-button-border: #ffffff;
   --color-text: #ffffff;
-  --color-muted: #e8e8e8;
+  --color-muted: #ebebeb;
   --color-accent: #ffe600;
   --color-on-accent: #000000;
   --color-accent-soft: #2a2600;
+  --color-danger: #ff9b9b;
   --color-highlight: #ffe600;
   --color-on-highlight: #000000;
   --color-focus: #00e5ff;
+  --color-bar: #0a0a0a;
+}
+
+/* Increase Contrast on the iPhone: outline every button, as iOS does. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-button-border: var(--color-text);
+  }
 }
 
 html,
@@ -87,6 +133,45 @@ body {
 }
 
 /*
+ * Glass: only for the control layer that floats above content (the reading toolbar, the
+ * navigation bars, the camera controls). Never glass on glass, and never for content. Opaque
+ * enough (84%) that text keeps 7:1 over any content behind it.
+ */
+.glass {
+  background-color: var(--color-bar);
+}
+.glass-dark {
+  background-color: var(--color-scrim);
+  color: var(--color-on-scrim);
+}
+@supports (background-color: color-mix(in srgb, red 50%, transparent)) {
+  .glass {
+    background-color: color-mix(in srgb, var(--color-bar) 84%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+  .glass-dark {
+    background-color: color-mix(in srgb, var(--color-scrim) 84%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+/* Reduce Transparency and Increase Contrast: solid bars. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .glass,
+  .glass-dark {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass {
+    background-color: var(--color-bar);
+  }
+  .glass-dark {
+    background-color: var(--color-scrim);
+  }
+}
+
+/*
  * Focus rings only for keyboard users: the start-up script in layout.tsx sets data-keyboard on
  * <html> after a key press and removes it on a tap. Headings the app focuses for VoiceOver
  * (tabindex="-1") never get a ring.
@@ -100,7 +185,7 @@ body {
   outline-offset: 3px;
 }
 
-/* The sentence being read aloud: a highlighter mark. */
+/* The sentence being read aloud: a highlighter mark, as in Speak Screen. */
 .reading-current {
   background: var(--color-highlight);
   color: var(--color-on-highlight);
@@ -112,7 +197,7 @@ body {
 
 /* A word the model could not read, or is unsure about. */
 .reading-marker {
-  background: var(--color-surface-3);
+  background: var(--color-surface-2);
   color: var(--color-text);
   border-radius: 0.3em;
   padding: 0 0.3em;

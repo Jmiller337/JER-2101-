@@ -147,7 +147,16 @@ The owner asked to hone in on simplicity. Nothing was removed; the less-used con
 - **Reading:** Back, Play or Pause, Forward, New document, Ask a question, and More. More shows Previous and Next paragraph, Spell, Slower, Faster, Add page, and Settings. In VoiceOver mode the list below the text is Play with app voice, Ask a question, New document, and More (Add page, Settings). Retake page still appears on its own when a page stopped part way.
 - **Camera:** Capture, Open a PDF, and More (Use phone camera instead, Settings). The small "Auto capture on" label is gone.
 - **Passcode:** just the field and Continue. **Settings:** the most used sections first (Speed, Voice, Colours, Camera, Sounds, How the app talks to you); "Forget passcode" is gone, because the app already asks again when the passcode changes on the server.
-- **Words:** the camera now says "Place the document in range of the camera. I'll take the picture when I can see the page." (the owner's wording), Add page says "Page 2. Place the next page in range of the camera.", and the end of a document is simply "End of document. Press Play to hear it again." The direction cues ("Move left", "Move away from you") still assume the phone is held above a page on a table.
+- **Words** (replaced in the design pass below): the camera said "Place the document in range of the camera. I'll take the picture when I can see the page." (the owner's wording), Add page says "Page 2. Place the next page in range of the camera.", and the end of a document is simply "End of document. Press Play to hear it again." The direction cues ("Move left", "Move away from you") still assume the phone is held above a page on a table.
+
+## Apple-style design pass
+
+The owner asked to drop the spoken placement instruction, said the capture screen was too busy, and supplied an Apple Human Interface design brief. `docs/DESIGN.md` now holds the per-screen spec in the brief's format.
+
+- **No placement instruction.** The camera says "Camera ready." and then only cues; the no-page cue is just "I can't see a page."; adding and retaking pages say "Add page 2." and "Retake page 1.".
+- **Capture screen.** The live picture fills the screen. On dark glass above it: More in the top corner (Open a PDF, Use phone camera instead, Settings), a small status capsule, and one Capture panel with a shutter across the bottom. The framing box and the visible "Camera" title are gone (the heading is still there for VoiceOver).
+- **Everywhere.** An Automatic theme (the new default) follows the iPhone's light or dark mode; Light, Dark, and Black and yellow remain. Buttons are borderless tinted fills with one filled primary action; New document is red. The reading toolbar floats on glass; Settings is an iOS grouped list with checkmarks and switches; Settings and Ask have Done in a navigation bar.
+- **Kept stricter than the brief:** 7:1 contrast and 64 pt primary targets, because the user is blind or low vision. SF Symbols cannot be used on the web, so the inline icons stay.
 
 ## What still needs the owner
 

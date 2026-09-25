@@ -11,7 +11,7 @@ test.describe("framing guidance with a page moving into view", () => {
     await expectSpoken(page, "Got it. Reading.");
     const spoken = await utterances(page);
     const order = [
-      "I can't see a page. Place the document in range of the camera.",
+      "I can't see a page.",
       "Move right.",
       "I see the whole page. Hold still.",
       "Got it. Reading.",
@@ -31,7 +31,7 @@ test.describe("framing guidance with a page moving into view", () => {
     await openToCamera(page, "readAloud", { autoCapture: true, guidance: "minimal" });
     await expectSpoken(page, "Got it. Reading.");
     const spoken = await utterances(page);
-    expect(spoken).not.toContain("I can't see a page. Place the document in range of the camera.");
+    expect(spoken).not.toContain("I can't see a page.");
     expect(spoken).not.toContain("Move right.");
     expect(spoken).toContain("I see the whole page. Hold still.");
   });

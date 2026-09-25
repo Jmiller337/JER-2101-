@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureAndRead, openMore, openToCamera } from "./helpers";
+import { captureAndRead, openMore, openToCamera, utterances } from "./helpers";
 
 test("the reading screen starts with only its core controls, the rest behind More", async ({ page }) => {
   await openToCamera(page);
@@ -14,10 +14,18 @@ test("the reading screen starts with only its core controls, the rest behind Mor
   }
 });
 
-test("the camera screen shows Capture, Open a PDF, and More", async ({ page }) => {
+test("the camera screen shows only More and Capture over the picture", async ({ page }) => {
   await openToCamera(page);
-  await expect(page.getByRole("button")).toHaveText([/Open a PDF/, /More/, /Capture/]);
+  await expect(page.getByRole("button")).toHaveText([/More/, /Capture/]);
   await openMore(page);
-  await expect(page.getByRole("button", { name: "Use phone camera instead" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
+  for (const name of ["Open a PDF", "Use phone camera instead", "Settings"]) {
+    await expect(page.getByRole("button", { name })).toBeVisible();
+  }
+});
+
+test("the camera never tells the user where to put the phone", async ({ page }) => {
+  await openToCamera(page);
+  await expect(page.getByTestId("camera-status")).toHaveText("Camera ready.");
+  const spoken = await utterances(page);
+  expect(spoken.filter((u) => /place|lay the phone|lift/i.test(u))).toEqual([]);
 });

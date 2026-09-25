@@ -37,28 +37,25 @@ export function ReadingScreen() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-ink text-text">
-      <div className="flex-1 px-5 pb-8 pt-5">
-        <header className="mb-5">
+      <div className="flex-1 px-4 pb-8 pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <header className="mb-6">
           {doc && (
-            <p className="mb-2 flex flex-wrap gap-2 text-base font-semibold text-muted">
-              {kind && kind !== "other" && (
-                <span className="rounded-full border border-line-2 bg-surface-2 px-3 py-0.5 capitalize">{kind}</span>
-              )}
-              <span className="rounded-full border border-line-2 bg-surface-2 px-3 py-0.5">
-                {pageCount === 1 ? "1 page" : `${pageCount} pages`}
-              </span>
+            <p className="mb-1 text-lg font-semibold text-muted">
+              {[kind && kind !== "other" ? kind.charAt(0).toUpperCase() + kind.slice(1) : null, pageCount === 1 ? "1 page" : `${pageCount} pages`]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           )}
-          <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-extrabold leading-tight tracking-tight">
+          <h1 ref={headingRef} tabIndex={-1} className="text-4xl font-bold leading-tight tracking-tight">
             {title}
           </h1>
         </header>
         {ui.errorText && (
-          <p ref={errorRef} tabIndex={-1} className="mb-4 rounded-2xl border border-accent/50 bg-accent-soft px-4 py-3 text-lg text-text">
+          <p ref={errorRef} tabIndex={-1} className="mb-5 rounded-2xl bg-accent-soft px-4 py-3 text-lg text-text">
             {ui.errorText}
           </p>
         )}
-        <div className="rounded-card border border-line bg-surface p-5">
+        <div>
           {doc ? (
             <Transcript doc={doc} version={session.version} current={appVoice ? reader.current : null} plain={!appVoice} />
           ) : (
@@ -84,7 +81,7 @@ export function ReadingScreen() {
               />
             )}
             <Button label="Ask a question" icon={<QuestionIcon />} onClick={() => controller.openAsk()} aria-disabled={!doc} />
-            <Button label="New document" icon={<NewDocumentIcon />} onClick={() => controller.newDocument()} />
+            <Button label="New document" icon={<NewDocumentIcon />} variant="destructive" onClick={() => controller.newDocument()} />
             <MoreButton
               expanded={more}
               onToggle={() => setMore((open) => !open)}

@@ -8,10 +8,11 @@ import { readJson, removeKey, writeJson, type StorageLike } from "./storage";
  */
 export type Mode = "readAloud" | "voiceOver";
 
-/** Colour themes. Every one keeps all text at 7:1 contrast or better. */
-export type Theme = "light" | "dark" | "contrast";
+/** Colour themes. Every one keeps all text at 7:1 contrast or better. Automatic follows the iPhone's light or dark mode. */
+export type Theme = "auto" | "light" | "dark" | "contrast";
 
 export const THEME_NAMES: Record<Theme, string> = {
+  auto: "Automatic",
   light: "Light",
   dark: "Dark",
   contrast: "Black and yellow",
@@ -38,7 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoCapture: true,
   guidance: "full",
   sounds: true,
-  theme: "light",
+  theme: "auto",
 };
 
 const SETTINGS_KEY = "docreader.settings.v1";
@@ -65,7 +66,7 @@ function parseStoredSettings(value: unknown): Partial<Settings> | null {
     check("autoCapture", typeof v.autoCapture === "boolean") &&
     check("guidance", v.guidance === "full" || v.guidance === "minimal") &&
     check("sounds", typeof v.sounds === "boolean") &&
-    check("theme", v.theme === "light" || v.theme === "dark" || v.theme === "contrast");
+    check("theme", v.theme === "auto" || v.theme === "light" || v.theme === "dark" || v.theme === "contrast");
   return valid ? out : null;
 }
 

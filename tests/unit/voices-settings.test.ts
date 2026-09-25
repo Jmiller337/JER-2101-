@@ -81,9 +81,9 @@ describe("voice quality", () => {
 });
 
 describe("settings", () => {
-  it("keeps a valid colour theme and defaults to Light", () => {
+  it("keeps a valid colour theme and defaults to Automatic", () => {
     const storage = new MemoryStorage();
-    expect(loadSettings(storage).theme).toBe("light");
+    expect(loadSettings(storage).theme).toBe("auto");
     saveSettings(storage, { ...DEFAULT_SETTINGS, theme: "contrast" });
     expect(loadSettings(storage).theme).toBe("contrast");
     storage.setItem("docreader.settings.v1", JSON.stringify({ ...DEFAULT_SETTINGS, theme: "purple" }));

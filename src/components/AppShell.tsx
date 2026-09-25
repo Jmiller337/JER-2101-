@@ -36,9 +36,19 @@ export function AppShell() {
 }
 
 /** Page background of each theme, for the browser's toolbar tint. Matches globals.css. */
-const THEME_BACKGROUNDS: Record<string, string> = { light: "#f4f4f0", dark: "#000000", contrast: "#000000" };
+const THEME_BACKGROUNDS: Record<string, string> = { light: "#ffffff", dark: "#000000", contrast: "#000000" };
 
 function applyTheme(theme: string): void {
-  document.documentElement.setAttribute("data-theme", theme);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BACKGROUNDS[theme] ?? "#f4f4f0");
+  const root = document.documentElement;
+  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  if (theme === "auto") {
+    // Automatic: the CSS follows the iPhone's setting, and each toolbar tint keeps its media query.
+    root.removeAttribute("data-theme");
+    metas.forEach((meta) =>
+      meta.setAttribute("content", meta.getAttribute("media")?.includes("dark") ? THEME_BACKGROUNDS.dark! : THEME_BACKGROUNDS.light!),
+    );
+    return;
+  }
+  root.setAttribute("data-theme", theme);
+  metas.forEach((meta) => meta.setAttribute("content", THEME_BACKGROUNDS[theme] ?? THEME_BACKGROUNDS.light!));
 }

@@ -72,7 +72,7 @@ test.describe("reading controls", () => {
     await page.getByRole("button", { name: "Preview voice" }).click();
     await expectSpoken(page, "This is how I will read your documents.");
 
-    await page.getByRole("button", { name: "Back to reading" }).click();
+    await page.getByRole("button", { name: "Done" }).click();
     await expectSpoken(page, "Resuming.");
 
     // Settings persist across a reload.

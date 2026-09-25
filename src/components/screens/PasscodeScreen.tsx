@@ -13,15 +13,15 @@ export function PasscodeScreen() {
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
   return (
-    <main className="flex min-h-dvh flex-col gap-6 bg-ink p-5 text-text">
+    <main className="flex min-h-dvh flex-col gap-6 bg-grouped px-4 pt-[max(1.5rem,env(safe-area-inset-top))] text-text">
       <div className="flex items-center gap-3">
         <LockIcon className="h-10 w-10 shrink-0 text-accent" />
-        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-extrabold tracking-tight">
+        <h1 ref={headingRef} tabIndex={-1} className="text-4xl font-bold tracking-tight">
           Enter the passcode
         </h1>
       </div>
       <form
-        className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5"
+        className="flex flex-col gap-5 rounded-card bg-surface p-4"
         onSubmit={(event) => {
           event.preventDefault();
           void controller.submitPasscode(value);
@@ -41,7 +41,7 @@ export function PasscodeScreen() {
           value={value}
           onChange={(event) => setValue(event.target.value)}
           aria-describedby={passcodeError ? "passcode-error" : undefined}
-          className="min-h-16 rounded-2xl border-2 border-line-2 bg-ink px-4 text-3xl text-text"
+          className="min-h-16 rounded-xl border-2 border-line-2 bg-ink px-4 text-3xl text-text"
         />
         {passcodeError && (
           <p id="passcode-error" ref={errorRef} tabIndex={-1} className="text-2xl font-semibold text-accent">
@@ -51,7 +51,7 @@ export function PasscodeScreen() {
         <button
           type="submit"
           aria-disabled={passcodeBusy}
-          className="min-h-24 rounded-2xl border-2 border-accent bg-accent text-4xl font-extrabold tracking-tight text-on-accent active:scale-[0.99]"
+          className="min-h-20 rounded-2xl border-2 border-button-border bg-accent text-3xl font-bold tracking-tight text-on-accent active:scale-[0.99]"
         >
           {passcodeBusy ? "Checking…" : "Continue"}
         </button>

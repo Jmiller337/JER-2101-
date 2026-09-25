@@ -111,7 +111,7 @@ Do this together with the user.
 Put a letter or bill on a table in good light.
 
 1. Open the app from the Home Screen icon (or Siri). Tap anywhere to start.
-2. The app says: "Place the document in range of the camera." Hold the phone above the letter, or hold the letter in front of the camera, so the whole page is in view.
+2. The app says "Camera ready." Hold the phone above the letter, or hold the letter in front of the camera, so the whole page is in view.
 3. Listen to the guidance: "Move left", "Move away from you", "Lift the phone higher", and so on. When the whole page is visible it says "I see the whole page. Hold still." Hold still for a moment: the app makes a camera sound and says "Got it. Reading."
 4. A few seconds later it says what the document is ("A water bill from…") and reads it. The yellow **Capture** button at the bottom of the screen takes the picture at once at any time.
 5. While reading: **Pause**/**Play**, **Back** and **Forward** (one sentence), **Previous paragraph** and **Next paragraph**, **Spell** (spells the current sentence letter by letter), **Slower**, **Faster**.
