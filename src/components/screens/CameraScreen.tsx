@@ -26,6 +26,7 @@ export function CameraScreen() {
   const pdfRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const lensRef = useRef<HTMLSpanElement>(null);
   const [more, setMore] = useState(false);
   const [swipe] = useState(() => new SwipeTracker());
   /** When the last swipe ended: the click that follows a swipe with a mouse is not a tap. */
@@ -41,6 +42,20 @@ export function CameraScreen() {
   }, [controller]);
 
   const mode = ui.cameraMode;
+
+  // The lens of lighter glass slides under the selected mode.
+  useEffect(() => {
+    const place = () => {
+      const tab = document.getElementById(`mode-${mode}`);
+      const lens = lensRef.current;
+      if (!tab || !lens) return;
+      lens.style.width = `${tab.offsetWidth}px`;
+      lens.style.transform = `translateX(${tab.offsetLeft}px)`;
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [mode]);
   const docInProgress = (session.doc?.pages.length ?? 0) > 0;
   const cameraFailed = ui.cameraStatus === "error";
   const openPhoneCamera = () => fileRef.current?.click();
@@ -113,7 +128,7 @@ export function CameraScreen() {
               {ui.cameraTitle}
             </h1>
             {docInProgress ? (
-              <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" className="rounded-full" onClick={() => controller.backToReading()} />
+              <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" onClick={() => controller.backToReading()} />
             ) : (
               <span />
             )}
@@ -124,7 +139,6 @@ export function CameraScreen() {
                 controls="more-camera-options"
                 icon={<MoreIcon />}
                 variant="glass"
-                className="rounded-full"
               />
               <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
                 {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
@@ -159,9 +173,10 @@ export function CameraScreen() {
       <FileInput inputRef={photoRef} accept="image/*" testId="photo-input" onFile={(file) => void controller.captureFromFile(file)} />
       <FileInput inputRef={pdfRef} accept="application/pdf,.pdf" testId="pdf-input" onFile={(file) => void controller.openPdf(file)} />
 
-      <div className="glass-dark flex shrink-0 flex-col rounded-t-[2rem] border-2 border-b-0 border-button-border pb-[env(safe-area-inset-bottom)]">
-        {/* The modes, like Photo, Video, and Slo-mo on the iPhone's Camera. */}
-        <div role="tablist" aria-label="Modes" className="flex justify-center gap-1 px-2 pt-2" onKeyDown={onTabKey}>
+      <div className="flex shrink-0 flex-col items-center bg-black pb-[env(safe-area-inset-bottom)]">
+        {/* The modes, like Photo, Video, and Slo-mo on the iPhone's Camera, in a glass capsule. */}
+        <div role="tablist" aria-label="Modes" className="glass-dark mt-3 flex gap-1 rounded-full p-1" onKeyDown={onTabKey}>
+          <span ref={lensRef} aria-hidden="true" className="glass-lens pointer-events-none absolute top-1 bottom-1 left-0 w-0 rounded-full" />
           {CAMERA_MODES.map((m) => (
             <button
               key={m}
@@ -172,7 +187,7 @@ export function CameraScreen() {
               aria-controls="camera-mode-panel"
               tabIndex={m === mode ? 0 : -1}
               onClick={() => chooseMode(m)}
-              className={`min-h-12 min-w-24 rounded-full px-4 text-xl font-bold tracking-wide uppercase ${
+              className={`relative min-h-12 min-w-24 rounded-full px-4 text-xl font-bold tracking-wide uppercase ${
                 m === mode ? "text-mode-selected" : "text-mode-idle"
               }`}
             >
@@ -182,12 +197,12 @@ export function CameraScreen() {
         </div>
 
         {/* The one primary action: the rest of the panel is the button. */}
-        <div role="tabpanel" id="camera-mode-panel" aria-labelledby={`mode-${mode}`}>
+        <div role="tabpanel" id="camera-mode-panel" aria-labelledby={`mode-${mode}`} className="w-full p-2">
           <button
             type="button"
             onClick={onAction}
             aria-disabled={ui.capturing}
-            className="group flex h-[24dvh] min-h-28 w-full flex-col items-center justify-center gap-3 text-on-scrim"
+            className="group flex h-[24dvh] min-h-28 w-full flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-button-border text-on-scrim"
           >
             {action.icon}
             <span className="text-3xl font-bold tracking-tight">{action.label}</span>

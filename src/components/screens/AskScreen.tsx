@@ -56,8 +56,8 @@ export function AskScreen() {
           <button
             type="submit"
             aria-disabled={ask.busy}
-            className={`inline-flex min-h-20 items-center justify-center gap-2.5 rounded-2xl border-2 border-button-border bg-accent text-3xl font-bold tracking-tight text-on-accent ${
-              ask.busy ? "opacity-60" : "active:scale-[0.98]"
+            className={`glass-prominent inline-flex min-h-20 items-center justify-center gap-2.5 rounded-full border-2 border-button-border text-3xl font-bold tracking-tight ${
+              ask.busy ? "opacity-60" : "liquid-press"
             }`}
           >
             <SendIcon className="h-8 w-8" />

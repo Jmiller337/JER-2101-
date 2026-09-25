@@ -1,26 +1,30 @@
 "use client";
 
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { CheckIcon } from "./icons";
 
-type Variant = "primary" | "secondary" | "destructive" | "plain" | "glass";
+type Variant = "primary" | "secondary" | "destructive" | "plain" | "glass" | "bar";
 type Size = "huge" | "large" | "normal";
 
 /*
- * Button styles, after the iOS button styles. No borders or shadows: a filled accent button for
- * the one primary action, tinted fills for everything else. Borders appear only in the Black and
- * yellow theme and with Increase Contrast (--color-button-border).
+ * Button styles, after the iOS 26 Liquid Glass button styles (see "Liquid Glass" in
+ * globals.css): tinted glass for the one primary action, clear glass for the rest, and no fill at
+ * all for items inside a glass bar. Borders appear only in the Black and yellow theme and with
+ * Increase Contrast (--color-button-border).
  */
 const VARIANTS: Record<Variant, string> = {
-  // Filled: the one primary action on a screen.
-  primary: "bg-accent text-on-accent",
-  // Tinted grey fill.
-  secondary: "bg-surface-2 text-text",
+  // Tinted glass: the one primary action on a screen.
+  primary: "glass-prominent",
+  // Clear glass.
+  secondary: "glass-button text-text",
   // Destructive: red label, never next to the primary action.
-  destructive: "bg-surface-2 text-danger",
-  // A text button, like Done in a navigation bar.
+  destructive: "glass-button text-danger",
+  // A text button.
   plain: "bg-transparent text-accent",
   // Over the live camera picture.
   glass: "glass-dark text-on-scrim",
+  // An item inside a glass bar: no fill of its own.
+  bar: "glass-item text-text",
 };
 
 const SIZES: Record<Size, string> = {
@@ -61,9 +65,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type="button"
-      className={`inline-flex touch-manipulation items-center justify-center rounded-2xl border-2 border-button-border font-semibold leading-tight select-none ${
-        layout === "stacked" ? "flex-col gap-1 py-2" : "gap-2.5"
-      } ${VARIANTS[variant]} ${SIZES[size]} ${unavailable ? "opacity-60" : "transition-transform active:scale-[0.98]"} ${className}`}
+      className={`inline-flex touch-manipulation items-center justify-center border-2 border-button-border font-semibold leading-tight select-none ${
+        // Capsules for one line, concentric rounded rectangles for taller buttons.
+        size === "huge" ? "rounded-[2rem]" : layout === "stacked" ? "flex-col gap-1 rounded-[1.4rem] py-2" : "gap-2.5 rounded-full"
+      } ${VARIANTS[variant]} ${SIZES[size]} ${unavailable ? "opacity-60" : "liquid-press"} ${className}`}
       {...rest}
     >
       {icon && (
@@ -87,6 +92,7 @@ export function MoreButton({
   icon,
   size = "normal",
   variant = "secondary",
+  layout = "row",
   className = "",
 }: {
   expanded: boolean;
@@ -96,6 +102,7 @@ export function MoreButton({
   icon: ReactNode;
   size?: Size;
   variant?: Variant;
+  layout?: "row" | "stacked";
   className?: string;
 }) {
   return (
@@ -106,6 +113,7 @@ export function MoreButton({
       icon={icon}
       size={size}
       variant={variant}
+      layout={layout}
       className={className}
       onClick={onToggle}
     />
@@ -113,8 +121,8 @@ export function MoreButton({
 }
 
 /**
- * The navigation bar of a modal screen (Settings, Ask): the screen's title on the leading side
- * and Done on the trailing side, on glass that floats above the scrolling content.
+ * The navigation bar of a modal screen (Settings, Ask): a floating glass capsule with the
+ * screen's title on the leading side and Done, with a checkmark, on the trailing side.
  */
 export function NavBar({
   title,
@@ -126,11 +134,13 @@ export function NavBar({
   onDone: () => void;
 }) {
   return (
-    <header className="glass sticky top-0 z-20 flex items-center justify-between gap-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
-      <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold tracking-tight">
-        {title}
-      </h1>
-      <Button label="Done" variant="plain" size="normal" className="shrink-0 px-3 text-2xl font-bold" onClick={onDone} />
-    </header>
+    <div className="scroll-edge-top sticky top-0 z-20 px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-4">
+      <header className="glass flex items-center justify-between gap-3 rounded-[1.75rem] py-2 pr-2 pl-4">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold tracking-tight">
+          {title}
+        </h1>
+        <Button label="Done" icon={<CheckIcon />} variant="bar" size="normal" className="shrink-0 px-4 text-2xl font-bold" onClick={onDone} />
+      </header>
+    </div>
   );
 }

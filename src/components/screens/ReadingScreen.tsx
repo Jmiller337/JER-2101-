@@ -106,6 +106,7 @@ export function ReadingScreen() {
                 aria-label={`Retake page ${retakeNumber}`}
                 icon={<RetakeIcon />}
                 size="normal"
+                variant="bar"
                 onClick={() => controller.retakePage()}
               />
             )

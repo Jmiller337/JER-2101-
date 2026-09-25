@@ -22,9 +22,9 @@ import {
 import { Button, MoreButton } from "./ui";
 
 /**
- * The fixed control bar for read-aloud mode (PROMPT.md screen 2). It starts with only the core
- * controls: Back, Play or Pause, Forward, New document, Ask a question, and More, which shows the
- * rest. Every control is a native button with a visible label; short labels get a fuller
+ * The floating glass toolbar for read-aloud mode (PROMPT.md screen 2). It starts with only the
+ * core controls: Back, Play or Pause, Forward, New document, Ask a question, and More, which shows
+ * the rest. One glass layer: Play is tinted glass and the other items have no fill of their own. Every control is a native button with a visible label; short labels get a fuller
  * accessible name that still contains the visible text (WCAG 2.5.3).
  */
 export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; hasDoc: boolean }) {
@@ -38,7 +38,7 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
   return (
     <nav
       aria-label="Reading controls"
-      className="glass sticky bottom-2 mx-2 mb-2 rounded-[1.75rem] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      className="glass sticky bottom-2 mx-2 mb-2 rounded-[2rem] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
         <Button
@@ -46,6 +46,7 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
           aria-label="Back one sentence"
           icon={<StepBackIcon />}
           layout="stacked"
+          variant="bar"
           size="large"
           className="px-2 text-xl"
           onClick={() => controller.back()}
@@ -64,6 +65,7 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
           aria-label="Forward one sentence"
           icon={<StepForwardIcon />}
           layout="stacked"
+          variant="bar"
           size="large"
           className="px-2 text-xl"
           onClick={() => controller.forward()}
@@ -73,10 +75,10 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
       <div className="mt-2 grid grid-cols-3 gap-2">
         <Button
           label="New document"
-          icon={<NewDocumentIcon />}
+          icon={<NewDocumentIcon className="text-danger" />}
           layout="stacked"
           size="normal"
-          variant="destructive"
+          variant="bar"
           onClick={() => controller.newDocument()}
         />
         <Button
@@ -84,6 +86,7 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
           icon={<QuestionIcon />}
           layout="stacked"
           size="normal"
+          variant="bar"
           onClick={() => controller.openAsk()}
           aria-disabled={!hasDoc}
         />
@@ -92,21 +95,23 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
           onToggle={() => setMore((open) => !open)}
           controls="more-reading-controls"
           icon={<MoreIcon />}
-          className="flex-col gap-1 py-2"
+          variant="bar"
+          layout="stacked"
         />
       </div>
       <div id="more-reading-controls" hidden={!more} className="mt-2 flex flex-col gap-2">
         <div className="grid grid-cols-2 gap-2">
-          <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" onClick={() => controller.previousParagraph()} />
-          <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" onClick={() => controller.nextParagraph()} />
+          <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" variant="bar" onClick={() => controller.previousParagraph()} />
+          <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" variant="bar" onClick={() => controller.nextParagraph()} />
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" onClick={() => controller.spell()} />
+          <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" variant="bar" onClick={() => controller.spell()} />
           <Button
             label="Slower"
             aria-label={`Slower, speed ${settings.rate.toFixed(1)}`}
             icon={<SlowerIcon />}
             size="normal"
+            variant="bar"
             onClick={() => controller.slower()}
           />
           <Button
@@ -114,12 +119,13 @@ export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; h
             aria-label={`Faster, speed ${settings.rate.toFixed(1)}`}
             icon={<FasterIcon />}
             size="normal"
+            variant="bar"
             onClick={() => controller.faster()}
           />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button label="Add page" icon={<AddPageIcon />} size="normal" onClick={() => controller.addPage()} aria-disabled={!hasDoc} />
-          <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
+          <Button label="Add page" icon={<AddPageIcon />} size="normal" variant="bar" onClick={() => controller.addPage()} aria-disabled={!hasDoc} />
+          <Button label="Settings" icon={<SettingsIcon />} size="normal" variant="bar" onClick={() => controller.openSettings()} />
         </div>
       </div>
     </nav>

@@ -13,7 +13,7 @@ export function StartButtonMarkup({
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col gap-6 bg-ink px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-text">
+    <main className="wallpaper flex min-h-dvh flex-col gap-6 px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-text">
       <header className="flex items-center gap-4">
         <BrandMark className="h-14 w-14 shrink-0" />
         <div>
@@ -26,7 +26,7 @@ export function StartButtonMarkup({
         type="button"
         data-start="1"
         onClick={onStart}
-        className="flex flex-1 flex-col items-center justify-center gap-5 rounded-[2rem] border-2 border-button-border bg-accent px-6 text-center text-5xl font-bold leading-tight tracking-tight text-on-accent active:scale-[0.99]"
+        className="glass-prominent liquid-press flex flex-1 flex-col items-center justify-center gap-5 rounded-[2.5rem] border-2 border-button-border px-6 text-center text-5xl font-bold leading-tight tracking-tight"
       >
         <PlayIcon className="h-16 w-16" />
         Start. Tap anywhere.

@@ -13,7 +13,7 @@ export function ModeScreen() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useFocusRequest(headingRef, "heading");
   return (
-    <main className="flex min-h-dvh flex-col gap-4 bg-ink px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-text">
+    <main className="wallpaper flex min-h-dvh flex-col gap-4 px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] text-text">
       <div>
         <h1 ref={headingRef} tabIndex={-1} className="text-4xl font-bold tracking-tight">
           Do you use VoiceOver?
@@ -23,7 +23,7 @@ export function ModeScreen() {
       <button
         type="button"
         onClick={() => controller.chooseMode("voiceOver")}
-        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-button-border bg-surface-2 p-6 text-center text-4xl font-bold tracking-tight text-text active:scale-[0.99]"
+        className="glass liquid-press flex flex-1 flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-button-border p-6 text-center text-4xl font-bold tracking-tight text-text"
       >
         <EarIcon className="h-14 w-14 text-accent" />
         I use VoiceOver
@@ -32,7 +32,7 @@ export function ModeScreen() {
       <button
         type="button"
         onClick={() => controller.chooseMode("readAloud")}
-        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-button-border bg-surface-2 p-6 text-center text-4xl font-bold tracking-tight text-text active:scale-[0.99]"
+        className="glass liquid-press flex flex-1 flex-col items-center justify-center gap-3 rounded-[2.5rem] border-2 border-button-border p-6 text-center text-4xl font-bold tracking-tight text-text"
       >
         <SpeakerIcon className="h-14 w-14 text-accent" />
         Read aloud to me
