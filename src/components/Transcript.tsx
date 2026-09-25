@@ -21,8 +21,9 @@ interface TranscriptProps {
 }
 
 /**
- * The document as real text: page headings, block headings as h2, paragraphs as p, list items
- * as a list, table rows and label-value lines as short paragraphs (PROMPT.md screen 2).
+ * The document as real text (PROMPT.md screen 2): page headings, block headings as h2,
+ * paragraphs as p, list items as a list, and table rows and label-value lines as short
+ * paragraphs grouped on one rounded card, like the rows of an iOS list.
  */
 export function Transcript({ doc, version, current, plain }: TranscriptProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -39,14 +40,17 @@ export function Transcript({ doc, version, current, plain }: TranscriptProps) {
   return (
     <div className="flex flex-col gap-6" data-testid="transcript">
       {pages.map((page) => (
-        <section key={page.number} className="flex flex-col gap-4">
+        <section key={page.number} className="flex flex-col gap-5">
           {pages.length > 1 && (
-            <h2 className="border-t border-line pt-6 text-xl font-semibold text-muted">
-              Page {page.number}
+            <h2 className="flex items-center gap-3 pt-4 text-lg font-semibold tracking-wide text-muted uppercase">
+              <span>Page {page.number}</span>
+              <span aria-hidden="true" className="h-px flex-1 bg-line" />
             </h2>
           )}
           {renderBlocks(page, plain, highlightKey, highlightRef)}
-          {page.failed && <p className="text-xl text-muted italic">The rest of this page could not be read.</p>}
+          {page.failed && (
+            <p className="rounded-3xl bg-card px-5 py-4 text-xl font-semibold text-muted">The rest of this page could not be read.</p>
+          )}
         </section>
       ))}
     </div>
@@ -61,18 +65,38 @@ function renderBlocks(
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let list: ReactNode[] = [];
+  let rows: ReactNode[] = [];
   const flushList = (key: string) => {
     if (list.length === 0) return;
     out.push(
-      <ul key={`list-${key}`} className="flex list-disc flex-col gap-2 pl-8 text-2xl">
+      <ul key={`list-${key}`} className="flex list-disc flex-col gap-2 pl-8 text-2xl leading-relaxed">
         {list}
       </ul>,
     );
     list = [];
   };
+  const flushRows = (key: string) => {
+    if (rows.length === 0) return;
+    out.push(
+      <div key={`rows-${key}`} className="divide-y divide-line overflow-hidden rounded-3xl bg-card">
+        {rows}
+      </div>,
+    );
+    rows = [];
+  };
   page.blocks.forEach((block, index) => {
     const key = `${page.number}-${index}`;
     const content = blockContent(block, page, index, plain, highlightKey, highlightRef);
+    if (block.kind === "table_row" || block.kind === "label_value") {
+      flushList(key);
+      rows.push(
+        <p key={key} className="px-5 py-3.5 text-2xl leading-snug">
+          {content}
+        </p>,
+      );
+      return;
+    }
+    flushRows(key);
     if (block.kind === "list_item") {
       list.push(<li key={key}>{content}</li>);
       return;
@@ -81,22 +105,14 @@ function renderBlocks(
     switch (block.kind) {
       case "heading":
         out.push(
-          <h2 key={key} className="text-3xl font-bold">
+          <h2 key={key} className="pt-2 text-3xl font-bold tracking-tight">
             {content}
           </h2>,
         );
         break;
       case "note":
         out.push(
-          <p key={key} className="text-2xl text-muted italic">
-            {content}
-          </p>,
-        );
-        break;
-      case "table_row":
-      case "label_value":
-        out.push(
-          <p key={key} className="border-l-4 border-line pl-3 text-2xl">
+          <p key={key} className="text-xl font-semibold text-muted">
             {content}
           </p>,
         );
@@ -110,6 +126,7 @@ function renderBlocks(
     }
   });
   flushList("end");
+  flushRows("end");
   return out;
 }
 

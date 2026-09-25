@@ -3,7 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { CheckIcon } from "./icons";
 
-type Variant = "primary" | "secondary" | "destructive" | "plain" | "glass" | "bar";
+type Variant = "primary" | "secondary" | "destructive" | "plain" | "glass" | "bar" | "float";
 type Size = "huge" | "large" | "normal";
 
 /*
@@ -25,6 +25,8 @@ const VARIANTS: Record<Variant, string> = {
   glass: "glass-dark text-on-scrim",
   // An item inside a glass bar: no fill of its own.
   bar: "glass-item text-text",
+  // A control floating on its own over content, as a small glass bar.
+  float: "glass text-text",
 };
 
 const SIZES: Record<Size, string> = {

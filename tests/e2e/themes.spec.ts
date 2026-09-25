@@ -21,7 +21,7 @@ for (const theme of ["dark", "contrast"] as const) {
     await captureAndRead(page);
     await expectNoAxeViolations(page, `reading (${theme})`);
     await openMore(page);
-    await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
     await expectNoAxeViolations(page, `settings (${theme})`);
   });

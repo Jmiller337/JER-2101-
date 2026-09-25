@@ -171,6 +171,11 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 - **Legibility is kept at 7:1.** Axe cannot judge text on translucent layers, so a new unit test reads the stylesheet's glass values and checks every text colour on glass against the worst backdrop in every theme (and that Automatic dark matches Dark). Getting there needed the camera glass at 84% opacity and a fainter button fill in light mode. Reduce Transparency, Increase Contrast, and Black and yellow make the glass solid.
 - **Deploying.** A clean build from GitHub, exactly as Fly builds it, succeeds. The home page is now sent with "no-store", so a phone always loads the newest version after a deploy.
 
+## Reading screen, redesigned
+
+- **The owner found the reading screen dated**, so it was redesigned to the Apple brief (goal, hierarchy, layout, states, what is left out; `docs/DESIGN.md`). The grid of equal tiles is gone. The player floats at the bottom like Apple's audio players: a large round Play in tinted glass between Back and Forward, a line showing how far the reader has got, and Ask a question below. New document and More float in the top corners (More where the camera's is), and More opens a glass menu with the paragraph, spell, speed, Add page, and Settings controls. The document gets a small kind capsule over its title, table rows sit on one rounded card instead of behind grey bars, notes are plain captions instead of italics, pages start with a small label and a hairline, and doubtful words are tinted capsules.
+- The tests that pinned the old toolbar now pin the new sets (`tests/e2e/simple.spec.ts`), and the others find the More items in the "More reading controls" group.
+
 ## What still needs the owner
 
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).

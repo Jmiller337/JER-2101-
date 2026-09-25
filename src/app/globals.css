@@ -17,6 +17,8 @@
   --color-surface: #ffffff;
   --color-surface-2: #e8e8ed;
   --color-surface-3: #dcdce2;
+  /* A card on the plain background: grouped rows such as a table in the transcript. */
+  --color-card: #f2f2f7;
   --color-line: #c6c6c8;
   --color-line-2: #8a8a8e;
   --color-button-border: transparent;
@@ -83,6 +85,7 @@
   --color-surface: #1c1c1e;
   --color-surface-2: #2c2c2e;
   --color-surface-3: #3a3a3c;
+  --color-card: #1c1c1e;
   --color-line: #38383a;
   --color-line-2: #8e8e93;
   --color-text: #ffffff;
@@ -118,6 +121,7 @@
     --color-surface: #1c1c1e;
     --color-surface-2: #2c2c2e;
     --color-surface-3: #3a3a3c;
+    --color-card: #1c1c1e;
     --color-line: #38383a;
     --color-line-2: #8e8e93;
     --color-text: #ffffff;
@@ -154,6 +158,7 @@
   --color-surface: #0a0a0a;
   --color-surface-2: #1a1a1a;
   --color-surface-3: #262626;
+  --color-card: #0a0a0a;
   --color-line: #404040;
   --color-line-2: #ffffff;
   --color-button-border: #ffffff;
@@ -312,7 +317,10 @@ body {
   }
   /* Above a floating bar, content fades out instead of showing in the gap (iOS's scroll edge). */
   .scroll-edge-top {
-    background-image: linear-gradient(180deg, var(--color-grouped) 62%, transparent);
+    background-image: linear-gradient(180deg, var(--edge, var(--color-grouped)) 62%, transparent);
+  }
+  .scroll-edge-bottom {
+    background-image: linear-gradient(0deg, var(--edge, var(--color-grouped)) 55%, transparent);
   }
   /* The first-launch screens' background: soft light for the glass to bend. */
   .wallpaper {
@@ -393,15 +401,16 @@ body {
   -webkit-box-decoration-break: clone;
 }
 
-/* A word the model could not read, or is unsure about. */
+/* A word the model could not read, or is unsure about: a small tinted capsule. */
 .reading-marker {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  border-radius: 0.3em;
-  padding: 0 0.3em;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border-radius: 999px;
+  padding: 0.05em 0.55em;
   margin: 0 0.15em;
-  font-size: 0.8em;
+  font-size: 0.78em;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 input[type="range"] {

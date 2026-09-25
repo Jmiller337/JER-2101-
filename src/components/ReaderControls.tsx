@@ -1,134 +1,96 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { AppController } from "@/lib/client/controller";
 import { useController, useStore } from "./hooks";
-import {
-  AddPageIcon,
-  FasterIcon,
-  MoreIcon,
-  NewDocumentIcon,
-  ParagraphDownIcon,
-  ParagraphUpIcon,
-  PauseIcon,
-  PlayIcon,
-  QuestionIcon,
-  SettingsIcon,
-  SlowerIcon,
-  SpellIcon,
-  StepBackIcon,
-  StepForwardIcon,
-} from "./icons";
-import { Button, MoreButton } from "./ui";
+import { PauseIcon, PlayIcon, QuestionIcon, StepBackIcon, StepForwardIcon } from "./icons";
+import { Button } from "./ui";
 
 /**
- * The floating glass toolbar for read-aloud mode (PROMPT.md screen 2). It starts with only the
- * core controls: Back, Play or Pause, Forward, New document, Ask a question, and More, which shows
- * the rest. One glass layer: Play is tinted glass and the other items have no fill of their own. Every control is a native button with a visible label; short labels get a fuller
- * accessible name that still contains the visible text (WCAG 2.5.3).
+ * The floating player for read-aloud mode (PROMPT.md screen 2), after Apple's audio players: a
+ * line showing how far through the document the reader is, a large round Play or Pause in tinted
+ * glass with Back and Forward on either side, and Ask a question below. The less-used controls
+ * are in the More menu at the top. Every control is a native button with a visible label; short
+ * labels get a fuller accessible name that still contains the visible text (WCAG 2.5.3).
  */
 export function ReaderControls({ retake, hasDoc }: { retake?: React.ReactNode; hasDoc: boolean }) {
   const controller = useController();
   const reader = useStore(controller.reader.store);
-  const settings = useStore(controller.settings);
-  const [more, setMore] = useState(false);
   const active = reader.status === "playing" || reader.status === "waiting" || reader.status === "spelling";
+  const progress =
+    reader.status === "ended" ? 100 : reader.itemCount > 0 ? Math.min(100, Math.max(0, ((reader.index + 1) / reader.itemCount) * 100)) : 0;
   useReadingShortcuts(controller);
 
   return (
     <nav
       aria-label="Reading controls"
-      className="glass sticky bottom-2 mx-2 mb-2 rounded-[2rem] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      className="scroll-edge-bottom sticky bottom-0 z-10 flex flex-col items-center gap-2 px-2 pt-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] [--edge:var(--color-ink)]"
     >
-      <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
-        <Button
-          label="Back"
-          aria-label="Back one sentence"
-          icon={<StepBackIcon />}
-          layout="stacked"
-          variant="bar"
-          size="large"
-          className="px-2 text-xl"
-          onClick={() => controller.back()}
-        />
-        <Button
-          label={active ? "Pause" : "Play"}
-          icon={active ? <PauseIcon /> : <PlayIcon />}
-          layout="stacked"
-          variant="primary"
-          size="large"
-          className="px-2"
-          onClick={() => controller.togglePlay()}
-        />
-        <Button
-          label="Forward"
-          aria-label="Forward one sentence"
-          icon={<StepForwardIcon />}
-          layout="stacked"
-          variant="bar"
-          size="large"
-          className="px-2 text-xl"
-          onClick={() => controller.forward()}
-        />
-      </div>
-      {retake && <div className="mt-2 grid">{retake}</div>}
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button
-          label="New document"
-          icon={<NewDocumentIcon className="text-danger" />}
-          layout="stacked"
-          size="normal"
-          variant="bar"
-          onClick={() => controller.newDocument()}
-        />
-        <Button
-          label="Ask a question"
-          icon={<QuestionIcon />}
-          layout="stacked"
-          size="normal"
-          variant="bar"
-          onClick={() => controller.openAsk()}
-          aria-disabled={!hasDoc}
-        />
-        <MoreButton
-          expanded={more}
-          onToggle={() => setMore((open) => !open)}
-          controls="more-reading-controls"
-          icon={<MoreIcon />}
-          variant="bar"
-          layout="stacked"
-        />
-      </div>
-      <div id="more-reading-controls" hidden={!more} className="mt-2 flex flex-col gap-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" variant="bar" onClick={() => controller.previousParagraph()} />
-          <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" variant="bar" onClick={() => controller.nextParagraph()} />
+      {retake && <div className="grid w-full">{retake}</div>}
+      <div className="glass w-full rounded-[2rem] px-3 pt-4 pb-2">
+        {/* How far through the document: for a sighted helper; the position is spoken on Pause. */}
+        <div aria-hidden="true" className="mx-4 h-1.5 overflow-hidden rounded-full bg-line">
+          <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" variant="bar" onClick={() => controller.spell()} />
-          <Button
-            label="Slower"
-            aria-label={`Slower, speed ${settings.rate.toFixed(1)}`}
-            icon={<SlowerIcon />}
-            size="normal"
-            variant="bar"
-            onClick={() => controller.slower()}
+        <div className="mt-2 grid grid-cols-3 items-end">
+          <TransportButton label="Back" name="Back one sentence" icon={<StepBackIcon className="h-9 w-9" />} onClick={() => controller.back()} />
+          <TransportButton
+            label={active ? "Pause" : "Play"}
+            icon={active ? <PauseIcon className="h-10 w-10" /> : <PlayIcon className="ml-1 h-10 w-10" />}
+            prominent
+            onClick={() => controller.togglePlay()}
           />
-          <Button
-            label="Faster"
-            aria-label={`Faster, speed ${settings.rate.toFixed(1)}`}
-            icon={<FasterIcon />}
-            size="normal"
-            variant="bar"
-            onClick={() => controller.faster()}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button label="Add page" icon={<AddPageIcon />} size="normal" variant="bar" onClick={() => controller.addPage()} aria-disabled={!hasDoc} />
-          <Button label="Settings" icon={<SettingsIcon />} size="normal" variant="bar" onClick={() => controller.openSettings()} />
+          <TransportButton label="Forward" name="Forward one sentence" icon={<StepForwardIcon className="h-9 w-9" />} onClick={() => controller.forward()} />
         </div>
       </div>
+      <Button
+        label="Ask a question"
+        icon={<QuestionIcon />}
+        variant="float"
+        size="large"
+        className="px-7"
+        onClick={() => controller.openAsk()}
+        aria-disabled={!hasDoc}
+      />
     </nav>
+  );
+}
+
+/**
+ * One of the player's three controls: a round slot for the icon (tinted glass for Play, empty for
+ * Back and Forward, since they sit on the player's glass) with the label underneath, so all three
+ * labels line up.
+ */
+function TransportButton({
+  label,
+  name,
+  icon,
+  prominent = false,
+  onClick,
+}: {
+  label: string;
+  name?: string;
+  icon: React.ReactNode;
+  prominent?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={name}
+      onClick={onClick}
+      className="glass-item liquid-press flex touch-manipulation flex-col items-center gap-1 rounded-[1.6rem] py-1 text-xl font-bold text-text select-none"
+    >
+      <span
+        aria-hidden="true"
+        className={`flex h-[4.75rem] w-[4.75rem] items-center justify-center rounded-full ${
+          prominent ? "glass-prominent border-2 border-button-border" : ""
+        }`}
+      >
+        {icon}
+      </span>
+      {label}
+    </button>
   );
 }
 

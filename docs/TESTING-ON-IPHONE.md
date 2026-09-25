@@ -99,7 +99,8 @@ Before starting, save a PDF to the iPhone's Files app (for example a bill emaile
 
 ## 4b. Simple screens
 
-- [ ] While reading, only six buttons show: Back, Play, Forward, New document, Ask a question, More. More shows the rest and VoiceOver says "More, collapsed" or "expanded".
+- [ ] While reading, New document and More float at the top, and the player at the bottom shows Back, a large round Play, Forward, and Ask a question below it. More opens a menu with the rest, and VoiceOver says "More, collapsed" or "expanded".
+- [ ] The line above Play fills as the document is read. Table rows appear together on a rounded card, and a new page starts with a small "Page 2" label.
 - [ ] On the camera screen only More, the mode strip (PDF, Camera, Photos), and the Capture panel show; More opens Use phone camera instead and Settings.
 
 ## 4c. Modes (like the iPhone's Camera)

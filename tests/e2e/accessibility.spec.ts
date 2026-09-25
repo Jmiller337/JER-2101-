@@ -19,7 +19,7 @@ test("every screen passes axe in read-aloud mode", async ({ page }) => {
   await expectNoAxeViolations(page, "reading");
   await openMore(page);
   await expectNoAxeViolations(page, "reading, with More open");
-  await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expectNoAxeViolations(page, "settings");
 });

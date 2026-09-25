@@ -11,10 +11,11 @@ test.describe("reading controls", () => {
 
   test("sentence, paragraph, spell, and speed controls", async ({ page }) => {
     const controls = page.getByRole("navigation", { name: "Reading controls" });
+    const menu = page.getByRole("group", { name: "More reading controls" });
 
     await clearUtterances(page);
-    await openMore(controls);
-    await controls.getByRole("button", { name: "Next paragraph" }).click();
+    await openMore(page);
+    await menu.getByRole("button", { name: "Next paragraph" }).click();
     await expectSpoken(page, "Dear Ms. Alvarez, thank you for being a customer.");
 
     await controls.getByRole("button", { name: "Forward one sentence" }).click();
@@ -23,17 +24,17 @@ test.describe("reading controls", () => {
     await controls.getByRole("button", { name: "Back one sentence" }).click();
     await expect.poll(async () => (await utterances(page)).filter((u) => u === "Dear Ms. Alvarez, thank you for being a customer.").length).toBe(2);
 
-    await controls.getByRole("button", { name: "Previous paragraph" }).click();
+    await menu.getByRole("button", { name: "Previous paragraph" }).click();
     await expect.poll(async () => (await utterances(page)).at(-1)).toBe("Riverside Water Utility");
 
-    await controls.getByRole("button", { name: "Spell the current sentence" }).click();
+    await menu.getByRole("button", { name: "Spell the current sentence" }).click();
     await expectSpoken(page, /^capital R, I, V, E, R, S, I, D, E, space/);
     await expect(controls.getByRole("button", { name: "Play" })).toBeVisible();
 
-    await controls.getByRole("button", { name: /^Faster/ }).click();
+    await menu.getByRole("button", { name: /^Faster/ }).click();
     await expectSpoken(page, "Speed 1.1.");
-    await controls.getByRole("button", { name: /^Slower/ }).click();
-    await controls.getByRole("button", { name: /^Slower/ }).click();
+    await menu.getByRole("button", { name: /^Slower/ }).click();
+    await menu.getByRole("button", { name: /^Slower/ }).click();
     await expectSpoken(page, "Speed 0.9.");
   });
 
@@ -79,7 +80,7 @@ test.describe("reading controls", () => {
     await page.reload();
     await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
     await openMore(page);
-    await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Reading speed")).toHaveValue("1.4");
   });
@@ -90,9 +91,8 @@ test("at the fastest speed, Faster says so and the reading carries on", async ({
   await setSpeechSpeed(page, 40);
   await captureAndRead(page);
   await expectSpoken(page, "Riverside Water Utility");
-  const controls = page.getByRole("navigation", { name: "Reading controls" });
-  await openMore(controls);
-  await controls.getByRole("button", { name: /^Faster/ }).click();
+  await openMore(page);
+  await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: /^Faster/ }).click();
   await expectSpoken(page, "That is the fastest speed.");
   await setSpeechSpeed(page, 2);
   await expectSpoken(page, "Your October bill is ready.");
