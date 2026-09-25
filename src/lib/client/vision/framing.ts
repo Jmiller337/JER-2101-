@@ -1,9 +1,11 @@
 import {
   analyzeFrame,
+  boxShift,
   centerBox,
   countEdges,
   laplacianVariance,
   toLuma,
+  type Box,
   type Edges,
   type FrameAnalysis,
   type Luma,
@@ -22,12 +24,16 @@ export type Situation =
   /** The whole page is visible and steady, but not for long enough yet. Silent. */
   | { kind: "settling" }
   | { kind: "blurry" }
-  | { kind: "ready" };
+  /**
+   * Take the picture. `lenient` means the framing checks were not all satisfied but the phone
+   * has been held calmly over a page for long enough: the reading model judges the photo.
+   */
+  | { kind: "ready"; lenient: boolean };
 
 /** Tunable thresholds (on a frame about 160 pixels wide). Tune on real phones; see PROGRESS.md. */
 export const FRAMING = {
   /** Page brightness (0 to 255) below which the scene is too dark. */
-  darkPageMean: 90,
+  darkPageMean: 70,
   /** Frame brightness below which the scene is too dark when no page is found. */
   darkFrameMean: 55,
   /** Fraction of page pixels that may be blown-out highlights before it counts as glare. */
@@ -36,6 +42,16 @@ export const FRAMING = {
   motion: 5,
   /** How long the page must stay steady before automatic capture. */
   steadyMs: 700,
+  /**
+   * A hand is never perfectly still, so frame differences alone never settle. The phone counts
+   * as calm while the detected page stays within `calmShift` pixels of where it was; a tremor
+   * moves it a pixel or two, sliding or shaking moves it more. After `calmMs` of calm with a
+   * page in view the picture is taken even if the framing checks (edges, size, glare,
+   * sharpness) are not satisfied: the reading model then judges the photo, which is far more
+   * reliable than these heuristics on a real phone.
+   */
+  calmShift: 3,
+  calmMs: 3000,
   /** Below this fraction of the frame the page is too far away. A fully visible letter-sized
    * page covers about 40 to 55 percent of a portrait frame, so this is deliberately low. */
   tooSmallCoverage: 0.2,
@@ -56,10 +72,14 @@ export const FRAMING = {
 export class FramingTracker {
   private previous: Luma | null = null;
   private steadySince: number | null = null;
+  /** Where the page was when the current calm period began. */
+  private calmRef: { box: Box; since: number } | null = null;
   private sharpMax = 0;
   private centerMax = 0;
   private frames = 0;
   lastAnalysis: FrameAnalysis | null = null;
+  /** How long the phone must be calm over a page before a lenient capture; Infinity turns it off. */
+  calmMs: number = FRAMING.calmMs;
 
   update(frame: PixelFrame, now: number): Situation {
     const analysis = analyzeFrame(frame, this.previous);
@@ -75,7 +95,18 @@ export class FramingTracker {
     else this.steadySince ??= now;
 
     const page = analysis.page;
-    const dark = page.found ? analysis.pageMean < FRAMING.darkPageMean : analysis.frameMean < FRAMING.darkFrameMean;
+    if (page.box) {
+      if (!this.calmRef || boxShift(this.calmRef.box, page.box) > FRAMING.calmShift) this.calmRef = { box: page.box, since: now };
+    } else {
+      this.calmRef = null;
+    }
+    const calibrated = this.frames >= FRAMING.calibrationFrames;
+    const veryDark = analysis.frameMean < FRAMING.darkFrameMean;
+    if (page.found && !veryDark && calibrated && this.calmRef && now - this.calmRef.since >= this.calmMs) {
+      return { kind: "ready", lenient: true };
+    }
+
+    const dark = page.found ? analysis.pageMean < FRAMING.darkPageMean : veryDark;
     if (dark) return { kind: "dark" };
     if (!page.found) return { kind: "noPage" };
     const t = page.touches;
@@ -86,14 +117,15 @@ export class FramingTracker {
     if (analysis.glare > FRAMING.glare) return { kind: "glare" };
     if (moving) return { kind: "moving" };
     if (this.steadySince === null || now - this.steadySince < FRAMING.steadyMs) return { kind: "settling" };
-    if (this.frames < FRAMING.calibrationFrames) return { kind: "settling" };
+    if (!calibrated) return { kind: "settling" };
     const sharp = analysis.sharpness >= FRAMING.sharpFloor && analysis.sharpness >= this.sharpMax * FRAMING.sharpRelative;
-    return sharp ? { kind: "ready" } : { kind: "blurry" };
+    return sharp ? { kind: "ready", lenient: false } : { kind: "blurry" };
   }
 
-  /** After a blurry capture: require a fresh steady period before firing again. */
+  /** After a capture that did not work out: require a fresh steady period before firing again. */
   resetSteady(): void {
     this.steadySince = null;
+    this.calmRef = null;
   }
 
   /**

@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#000000",
+  themeColor: "#0b0f1a",
 };
 
 /**
@@ -39,7 +39,7 @@ const STARTUP_FALLBACK = `(function () {
       region = document.createElement("div");
       region.id = "startup-status";
       region.setAttribute("role", "alert");
-      region.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:50;padding:16px;background:#000;color:#fde047;font:bold 24px/1.3 system-ui,sans-serif";
+      region.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:50;padding:16px;background:#0b0f1a;color:#ffd166;font:bold 24px/1.3 system-ui,sans-serif";
       document.body.appendChild(region);
     }
     region.textContent = text;

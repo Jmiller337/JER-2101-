@@ -6,8 +6,10 @@ import { parseAskEvent, parseReadEvent } from "@/lib/shared/protocol";
 
 describe("parseReadEvent", () => {
   it("accepts every valid event", () => {
-    const meta = { type: "meta", status: "ok", language: "en", kind: "letter", title: "A letter", warning: "Cut off." };
+    const meta = { type: "meta", status: "ok", language: "en", kind: "letter", title: "A letter" };
     expect(parseReadEvent(meta)).toEqual(meta);
+    // Remarks about the photo are never carried to the phone.
+    expect(parseReadEvent({ ...meta, warning: "Cut off." })).toEqual(meta);
     expect(parseReadEvent({ type: "block", kind: "note", text: "A picture." })).toEqual({ type: "block", kind: "note", text: "A picture." });
     expect(parseReadEvent({ type: "done", blocks: 3 })).toEqual({ type: "done", blocks: 3 });
     expect(parseReadEvent({ type: "error", code: "refusal", message: "No." })).toEqual({ type: "error", code: "refusal", message: "No." });

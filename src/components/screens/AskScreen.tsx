@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ASK_LIMITS } from "@/lib/shared/protocol";
 import { useController, useFocusRequest, useStore } from "../hooks";
+import { BackIcon, MicIcon, QuestionIcon, SendIcon } from "../icons";
 import { Button } from "../ui";
 
 /**
@@ -22,12 +23,15 @@ export function AskScreen() {
   const value = ask.listening ? ask.heard : draft;
 
   return (
-    <main className="flex min-h-dvh flex-col gap-5 bg-black p-5 pb-10 text-white">
-      <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold">
-        Ask a question
-      </h1>
+    <main className="flex min-h-dvh flex-col gap-5 bg-ink p-5 pb-10 text-text">
+      <div className="flex items-center gap-3">
+        <QuestionIcon className="h-10 w-10 shrink-0 text-accent" />
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-extrabold tracking-tight">
+          Ask a question
+        </h1>
+      </div>
       <form
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-card"
         onSubmit={(event) => {
           event.preventDefault();
           // Clear the box only when the question was accepted, so nothing typed is lost.
@@ -50,20 +54,24 @@ export function AskScreen() {
               event.currentTarget.form?.requestSubmit();
             }
           }}
-          className="rounded-2xl border-4 border-white bg-neutral-900 p-3 text-2xl text-white"
+          className="rounded-2xl border-2 border-line-2 bg-ink p-3 text-2xl text-text"
         />
         <div className="grid grid-cols-2 gap-3">
           <button
             type="submit"
             aria-disabled={ask.busy}
-            className="min-h-20 rounded-2xl border-4 border-yellow-300 bg-yellow-300 text-3xl font-extrabold text-black"
+            className={`inline-flex min-h-20 items-center justify-center gap-2.5 rounded-2xl border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 text-3xl font-extrabold tracking-tight text-on-accent shadow-glow ${
+              ask.busy ? "opacity-60" : "active:scale-[0.98]"
+            }`}
           >
+            <SendIcon className="h-8 w-8" />
             {ask.busy ? "Answering…" : "Send"}
           </button>
           <Button
             label={ask.listening ? "Stop and send" : "Talk"}
             aria-label={ask.listening ? "Stop and send" : "Talk: say your question"}
             aria-pressed={ask.listening}
+            icon={<MicIcon />}
             size="large"
             className="min-h-20 text-3xl"
             onClick={() => controller.toggleListening()}
@@ -71,7 +79,7 @@ export function AskScreen() {
         </div>
       </form>
       {ui.errorText && (
-        <p ref={errorRef} tabIndex={-1} className="text-lg text-yellow-300">
+        <p ref={errorRef} tabIndex={-1} className="rounded-2xl border border-accent/50 bg-accent-soft px-4 py-3 text-lg">
           {ui.errorText}
         </p>
       )}
@@ -82,8 +90,8 @@ export function AskScreen() {
           </h2>
           <ol className="flex flex-col gap-4" data-testid="answers">
             {[...ask.turns].reverse().map((turn) => (
-              <li key={turn.id} className="rounded-2xl border-2 border-neutral-600 p-4 text-2xl">
-                <p className="font-semibold">Question: {turn.question}</p>
+              <li key={turn.id} className="rounded-card border border-line bg-surface-2 p-4 text-2xl shadow-card">
+                <p className="font-semibold text-muted">Question: {turn.question}</p>
                 <p className="mt-2">
                   Answer:{" "}
                   {turn.status === "error"
@@ -95,7 +103,7 @@ export function AskScreen() {
           </ol>
         </section>
       )}
-      <Button label="Back to reading" size="large" onClick={() => controller.closeAsk()} className="mt-auto" />
+      <Button label="Back to reading" icon={<BackIcon />} size="large" onClick={() => controller.closeAsk()} className="mt-auto" />
     </main>
   );
 }

@@ -28,7 +28,7 @@ describe("POST /api/read", () => {
     expect(params.max_tokens).toBe(16000);
     expect(params.betas).toEqual(["server-side-fallback-2026-07-01"]);
     expect(params.fallbacks).toBe("default");
-    expect(params.output_config).toEqual({ effort: "low" });
+    expect(params.output_config).toEqual({ effort: "high" });
     expect(params).not.toHaveProperty("thinking");
     expect(params).not.toHaveProperty("temperature");
     const content = params.messages[0]!.content as Array<{ type: string; text?: string }>;

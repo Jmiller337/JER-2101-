@@ -343,6 +343,11 @@ export function findPage(luma: Luma): PageEstimate {
   return { found: true, box, coverage, touches: touchingEdges(box, width, height), strategy: "edges" };
 }
 
+/** How far two boxes differ: the largest change of any edge, in pixels. */
+export function boxShift(a: Box, b: Box): number {
+  return Math.max(Math.abs(a.x0 - b.x0), Math.abs(a.y0 - b.y0), Math.abs(a.x1 - b.x1), Math.abs(a.y1 - b.y1));
+}
+
 /** Mean absolute difference between two frames of the same size. */
 export function frameDifference(a: Luma, b: Luma): number {
   if (a.width !== b.width || a.height !== b.height) return Infinity;

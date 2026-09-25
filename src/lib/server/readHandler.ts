@@ -19,8 +19,9 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
     max_tokens: LIMITS.maxTokens,
     betas: [FALLBACK_BETA],
     fallbacks: "default",
-    // Transcription needs perception, not deliberation, and latency matters.
-    output_config: { effort: "low" },
+    // Full effort: a page must be transcribed to the last line. Lower settings shorten the
+    // output, which for a transcription means words left out.
+    output_config: { effort: "high" },
     system: READ_SYSTEM_PROMPT,
     messages: [
       {

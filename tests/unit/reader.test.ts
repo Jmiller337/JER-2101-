@@ -197,10 +197,11 @@ describe("Reader", () => {
     reader.setLoading(true);
     reader.continueAfterAddPage(2);
     expect(reader.store.get().status).toBe("waiting");
-    reader.beginPage(2, { title: "Page two", language: "en", warning: "The bottom of the page is cut off." });
+    reader.beginPage(2, { title: "Page two", language: "en" });
     expect(port.speaking).toBe("Page 2 added.");
+    reader.addBlock(2, 0, "paragraph", "Second page text.");
     port.finish();
-    expect(port.speaking).toBe("The bottom of the page is cut off.");
+    expect(port.speaking).toBe("Second page text.");
   });
 
   it("waits at a page boundary until the earlier page has finished arriving", () => {

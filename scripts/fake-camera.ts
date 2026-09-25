@@ -141,6 +141,14 @@ export const VIDEOS: Record<string, VideoSpec> = {
   },
   // A dark room.
   "dark-room": { width: 480, height: 360, fps: 10, seconds: 3, keyframes: [{ at: 0, page: CENTERED }], light: 0.2 },
+  // A page held too close, overflowing the frame on every side, with a slight hand tremor.
+  "page-too-close": {
+    width: 480,
+    height: 360,
+    fps: 10,
+    seconds: 8,
+    keyframes: [{ at: 0, page: { cx: 0.5, cy: 0.5, w: 1.15, h: 1.15 }, jitter: 3 }],
+  },
 };
 
 export function generateAll(dir: string, force = false): string[] {

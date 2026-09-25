@@ -125,7 +125,6 @@ export class DocumentSession {
                 language: event.language,
                 kind: event.kind,
                 title: event.title,
-                ...(event.warning ? { warning: event.warning } : {}),
                 blocks: [],
                 complete: false,
                 ...(image.blob ? { image: image.blob } : {}),

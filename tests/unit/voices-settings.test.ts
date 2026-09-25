@@ -9,7 +9,7 @@ import {
   saveSettings,
 } from "@/lib/client/settings";
 import type { VoiceInfo } from "@/lib/client/speech/port";
-import { pickVoice, voicesForLanguage } from "@/lib/client/speech/voices";
+import { betterVoiceAvailable, pickVoice, voiceQuality, voicesForLanguage } from "@/lib/client/speech/voices";
 import { MemoryStorage } from "@/lib/client/storage";
 
 function voice(name: string, lang: string, extra: Partial<VoiceInfo> = {}): VoiceInfo {
@@ -54,6 +54,29 @@ describe("pickVoice", () => {
       "Daniel (Enhanced)",
       "Samantha",
     ]);
+  });
+});
+
+describe("voice quality", () => {
+  const v = (name: string, lang = "en-US"): VoiceInfo => ({ name, lang, voiceURI: `uri.${name}`, default: false, localService: true });
+
+  it("rates Premium above Enhanced above the basic voice", () => {
+    expect(voiceQuality(v("Ava (Premium)"))).toBe("premium");
+    expect(voiceQuality(v("Samantha (Enhanced)"))).toBe("enhanced");
+    expect(voiceQuality(v("Samantha"))).toBe("standard");
+    const picked = pickVoice([v("Samantha"), v("Samantha (Enhanced)"), v("Ava (Premium)")], "en-US", null);
+    expect(picked?.name).toBe("Ava (Premium)");
+  });
+
+  it("never picks an old synthetic voice automatically but keeps it in the list", () => {
+    expect(pickVoice([v("Fred"), v("Samantha")], "en-US", null)?.name).toBe("Samantha");
+    expect(voicesForLanguage([v("Fred"), v("Samantha")], "en-US").map((x) => x.name)).toEqual(["Fred", "Samantha"]);
+  });
+
+  it("says a better voice is available only when just basic voices speak the language", () => {
+    expect(betterVoiceAvailable([v("Samantha"), v("Fred")], "en-US")).toBe(true);
+    expect(betterVoiceAvailable([v("Samantha"), v("Ava (Premium)")], "en-US")).toBe(false);
+    expect(betterVoiceAvailable([v("Monica", "es-ES")], "en-US")).toBe(false);
   });
 });
 

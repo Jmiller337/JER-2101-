@@ -34,6 +34,8 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Slide the phone so the page is cut off on the left. The app says "Move left." Moving the phone to the left brings the page into view. Repeat for right ("Move right."), top ("Move away from you."), and bottom ("Move toward you."). **If any direction is backwards, write down which.**
 - [ ] Held very close (page overflowing the screen): "Lift the phone higher." Held far away: "Move closer to the page."
 - [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and reads the page. No button press needed.
+- [ ] Hold the phone too close (the page overflowing the screen) but still for about three seconds: the app takes the picture anyway, and either reads the page or says what to change. Note roughly how long it waited: ______ seconds.
+- [ ] Hold the phone still over a page in the ordinary way for five seconds without pressing anything: the picture is taken. If it is not, note what the app said instead.
 - [ ] Cues are never faster than about one every one and a half seconds, and the same cue is not repeated within four seconds.
 - [ ] In a dark room: "Too dark. Turn on a light." (or, on a phone whose browser allows the flashlight, "It's dark, so I turned on the light." and the flashlight comes on).
 - [ ] A lamp reflecting on glossy paper: "Glare. Tilt the phone a little."
@@ -77,6 +79,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 
 - [ ] Settings pauses reading. Each change is spoken ("Speed 1.3.", "Automatic capture off…", "Sounds off.").
 - [ ] The voice list shows the phone's voices. If an Enhanced or Premium voice is installed, "Automatic" uses it. Preview speaks a sample.
+- [ ] If the Voice section shows "A nicer voice is available", download a voice as it says (Ava or Zoe, Enhanced or Premium). Afterwards the card is gone and Preview sounds noticeably better.
 - [ ] "Back to reading" says "Resuming." and continues.
 - [ ] Settings survive closing and reopening Safari.
 
@@ -105,7 +108,8 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 
 - [ ] Handwritten note: the app reads it and marks doubtful words with "possibly".
 - [ ] A page photographed in dim light: either it reads, or it says clearly what is wrong ("Too dark…").
-- [ ] A page with part cut off: it reads what it can and warns that part is cut off.
+- [ ] A page with part cut off: it reads what it can and says nothing about the photo.
+- [ ] A full page of small print: the reading goes all the way to the last line, including footers and reference numbers.
 - [ ] Something that is not a document (a hand, the table): it asks you to try again and says why.
 
 ## 7a. Errors

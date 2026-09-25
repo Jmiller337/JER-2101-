@@ -40,10 +40,13 @@ export function Transcript({ doc, version, current, plain }: TranscriptProps) {
     <div className="flex flex-col gap-6" data-testid="transcript">
       {pages.map((page) => (
         <section key={page.number} className="flex flex-col gap-4">
-          {pages.length > 1 && <h2 className="text-3xl font-bold text-yellow-300">Page {page.number}</h2>}
-          {page.warning && <p className="rounded-xl border-2 border-yellow-300 p-3 text-xl">{page.warning}</p>}
+          {pages.length > 1 && (
+            <h2 className="self-start rounded-full border border-accent/60 bg-accent-soft px-4 py-1 text-xl font-bold text-accent">
+              Page {page.number}
+            </h2>
+          )}
           {renderBlocks(page, plain, highlightKey, highlightRef)}
-          {page.failed && <p className="text-xl italic">The rest of this page could not be read.</p>}
+          {page.failed && <p className="text-xl text-muted italic">The rest of this page could not be read.</p>}
         </section>
       ))}
     </div>
@@ -85,7 +88,7 @@ function renderBlocks(
         break;
       case "note":
         out.push(
-          <p key={key} className="text-2xl italic text-neutral-200">
+          <p key={key} className="text-2xl text-muted italic">
             {content}
           </p>,
         );
@@ -93,7 +96,7 @@ function renderBlocks(
       case "table_row":
       case "label_value":
         out.push(
-          <p key={key} className="border-l-4 border-neutral-500 pl-3 text-2xl">
+          <p key={key} className="border-l-4 border-accent/60 pl-3 text-2xl">
             {content}
           </p>,
         );
@@ -127,7 +130,7 @@ function blockContent(
         {sentenceIndex > 0 && " "}
         <span
           ref={active ? highlightRef : undefined}
-          className={active ? "rounded bg-yellow-300 text-black" : undefined}
+          className={active ? "reading-current" : undefined}
           data-current={active || undefined}
         >
           {withMarkers(sentence)}
@@ -141,7 +144,7 @@ function withMarkers(text: string): ReactNode[] {
   return splitMarkers(text).map((part, i) => {
     if (part.type === "text") return <Fragment key={i}>{part.text}</Fragment>;
     return (
-      <mark key={i} className="mx-1 rounded bg-neutral-700 px-1 text-yellow-200">
+      <mark key={i} className="reading-marker">
         {part.type === "unclear" ? "(unclear word)" : "(possibly)"}
       </mark>
     );

@@ -6,11 +6,11 @@ type Variant = "primary" | "secondary" | "quiet";
 type Size = "huge" | "large" | "normal";
 
 const VARIANTS: Record<Variant, string> = {
-  // Black on yellow: about 16:1 contrast.
-  primary: "bg-yellow-300 text-black border-4 border-yellow-300",
-  // White on near-black with a white border: about 19:1.
-  secondary: "bg-neutral-900 text-white border-2 border-white",
-  quiet: "bg-black text-white border-2 border-neutral-400",
+  // Near-black on amber: about 13:1.
+  primary: "bg-linear-to-b from-accent to-accent-2 text-on-accent border-2 border-accent-2 shadow-glow",
+  // Off-white on slate: about 14:1.
+  secondary: "bg-surface-2 text-text border-2 border-line-2",
+  quiet: "bg-transparent text-text border-2 border-line",
 };
 
 const SIZES: Record<Size, string> = {
@@ -19,10 +19,20 @@ const SIZES: Record<Size, string> = {
   normal: "min-h-12 text-xl px-4",
 };
 
+const ICON_SIZES: Record<Size, string> = {
+  huge: "h-10 w-10",
+  large: "h-7 w-7",
+  normal: "h-6 w-6",
+};
+
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   label: ReactNode;
+  /** A decorative icon (hidden from VoiceOver) shown before the label. */
+  icon?: ReactNode;
   variant?: Variant;
   size?: Size;
+  /** `stacked` puts the icon above the label, for narrow columns. */
+  layout?: "row" | "stacked";
 }
 
 /**
@@ -33,7 +43,7 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
  * a tap doing nothing at all.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { label, variant = "secondary", size = "large", className = "", onClick, ...rest },
+  { label, icon, variant = "secondary", size = "large", layout = "row", className = "", ...rest },
   ref,
 ) {
   const unavailable = rest["aria-disabled"] === true || rest["aria-disabled"] === "true";
@@ -41,13 +51,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type="button"
-      className={`rounded-2xl font-bold leading-tight ${VARIANTS[variant]} ${SIZES[size]} ${
-        unavailable ? "opacity-60" : "active:scale-[0.99]"
-      } ${className}`}
-      onClick={onClick}
+      className={`inline-flex touch-manipulation items-center justify-center rounded-2xl font-bold leading-tight tracking-tight select-none ${
+        layout === "stacked" ? "flex-col gap-1 py-2" : "gap-2.5"
+      } ${VARIANTS[variant]} ${SIZES[size]} ${unavailable ? "opacity-60" : "transition-transform active:scale-[0.98]"} ${className}`}
       {...rest}
     >
-      {label}
+      {icon && (
+        <span aria-hidden="true" className={`shrink-0 ${ICON_SIZES[size]} [&>svg]:h-full [&>svg]:w-full`}>
+          {icon}
+        </span>
+      )}
+      <span>{label}</span>
     </button>
   );
 });

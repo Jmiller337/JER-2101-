@@ -11,7 +11,6 @@ export interface DocPage {
   language: string;
   kind: string;
   title: string;
-  warning?: string;
   blocks: DocBlock[];
   complete: boolean;
   /** The read stopped early (an error after some text arrived). */
@@ -44,10 +43,9 @@ function parseBlock(value: unknown): DocBlock | null {
 
 function parsePage(value: unknown): DocPage | null {
   if (!isObject(value)) return null;
-  const { number, language, kind, title, warning, blocks, complete, failed } = value;
+  const { number, language, kind, title, blocks, complete, failed } = value;
   if (typeof number !== "number" || !Number.isInteger(number) || number < 1) return null;
   if (typeof language !== "string" || typeof kind !== "string" || typeof title !== "string") return null;
-  if (warning !== undefined && typeof warning !== "string") return null;
   if (typeof complete !== "boolean" || (failed !== undefined && typeof failed !== "boolean")) return null;
   if (!Array.isArray(blocks)) return null;
   const parsed = blocks.map(parseBlock);
@@ -57,7 +55,6 @@ function parsePage(value: unknown): DocPage | null {
     language,
     kind,
     title,
-    ...(warning !== undefined ? { warning } : {}),
     blocks: parsed as DocBlock[],
     complete,
     ...(failed !== undefined ? { failed } : {}),

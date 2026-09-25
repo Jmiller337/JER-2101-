@@ -17,7 +17,7 @@ export function AppShell() {
     <>
       <LiveRegions />
       {speechUnavailable && (
-        <p className="bg-yellow-300 px-4 py-3 text-xl font-bold text-black" data-testid="speech-banner">
+        <p className="bg-accent px-4 py-3 text-xl font-bold text-on-accent" data-testid="speech-banner">
           This browser cannot speak. Open the app in Safari, or turn on VoiceOver to hear it.
         </p>
       )}

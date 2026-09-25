@@ -28,7 +28,7 @@ import { Speaker, type Timers } from "./speech/speaker";
 import { pickVoice, voicesForLanguage } from "./speech/voices";
 import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
-import { CuePolicy, FramingTracker, type Situation } from "./vision/framing";
+import { FRAMING, CuePolicy, FramingTracker, type Situation } from "./vision/framing";
 import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
@@ -142,6 +142,10 @@ export class AppController {
   /** Automatic capture fires at most once per visit to the camera screen (PROMPT.md 6.3). */
   private armed = false;
   private torchTried = false;
+  /** Whether the last picture was taken automatically (a retry then counts against the back-off). */
+  private lastCaptureAutomatic = false;
+  /** Automatic pictures in a row that the model could not read. */
+  private autoRetries = 0;
   private readonly cleanups: Array<() => void> = [];
   private answerSpeech: StreamingSpeech | null = null;
   private askAbort: AbortController | null = null;
@@ -452,10 +456,19 @@ export class AppController {
   private startGuidance(): void {
     this.stopGuidance();
     this.tracker = new FramingTracker();
+    this.tracker.calmMs = this.calmMsForRetries();
     this.cuePolicy.reset();
     this.armed = true;
     this.torchTried = false;
     this.scheduleAnalysis(250);
+  }
+
+  /**
+   * The lenient capture waits longer after each automatic picture the model could not read, and
+   * after three in a row it stops: the user then presses Capture (or the strict checks pass).
+   */
+  private calmMsForRetries(): number {
+    return this.autoRetries >= 3 ? Infinity : FRAMING.calmMs * (1 + this.autoRetries);
   }
 
   private stopGuidance(): void {
@@ -515,6 +528,7 @@ export class AppController {
     const camera = this.camera;
     if (!camera || this.ui.get().capturing) return;
     this.armed = false;
+    this.lastCaptureAutomatic = true;
     this.ui.update({ capturing: true });
     this.sounds.shutter();
     try {
@@ -553,6 +567,8 @@ export class AppController {
   async captureManual(): Promise<void> {
     if (this.ui.get().capturing) return;
     this.armed = false;
+    this.lastCaptureAutomatic = false;
+    this.autoRetries = 0;
     this.ui.update({ capturing: true });
     const camera = await this.waitForCamera(5000);
     if (!camera) {
@@ -575,6 +591,8 @@ export class AppController {
   async captureFromFile(file: File): Promise<void> {
     if (this.ui.get().capturing) return;
     this.armed = false;
+    this.lastCaptureAutomatic = false;
+    this.autoRetries = 0;
     this.ui.update({ capturing: true });
     try {
       const image = await imageFromFile(file);
@@ -629,12 +647,17 @@ export class AppController {
         this.quietReaderAfterFailedCapture(adding);
         this.sounds.error();
         this.say(problem, { alert: true });
+        if (this.lastCaptureAutomatic) {
+          this.autoRetries += 1;
+          if (this.autoRetries === 3) this.say("I'll wait for you to press Capture.");
+        }
         void this.openCamera({ addPage: adding ? pageNumber : null, intro: "none" });
       },
       onPageStart: (page, meta) => {
+        this.autoRetries = 0;
         this.stopLoadingTicker();
         this.sounds.pageFound();
-        this.reader.beginPage(page.number, { title: meta.title, warning: meta.warning, language: meta.language });
+        this.reader.beginPage(page.number, { title: meta.title, language: meta.language });
         if (!this.appVoiceActive) this.say(liveTitleAnnouncement(page, meta));
       },
       onBlock: (page, index, block) => {
@@ -727,7 +750,7 @@ export class AppController {
   private restoreDocument(doc: Doc): void {
     this.reader.reset();
     for (const page of doc.pages) {
-      this.reader.beginPage(page.number, { title: page.title, warning: page.warning, language: page.language });
+      this.reader.beginPage(page.number, { title: page.title, language: page.language });
       page.blocks.forEach((block, index) => this.reader.addBlock(page.number, index, block.kind, block.text));
       this.reader.completePage(page.number);
     }
@@ -804,6 +827,7 @@ export class AppController {
     }
     this.newDocumentArmedUntil = 0;
     this.retakeTarget = null;
+    this.autoRetries = 0;
     this.teardownAsk();
     this.ask.update({ turns: [], busy: false });
     this.reader.reset();
@@ -1258,8 +1282,7 @@ export function partialPageMessage(pageNumber: number, retakeable: boolean, appV
 
 function liveTitleAnnouncement(page: DocPage, meta: MetaEvent): string {
   const title = sentence(meta.title);
-  const warning = meta.warning ? ` ${meta.warning}` : "";
-  return page.number === 1 ? `${title}${warning}`.trim() || "Reading page 1." : `Page ${page.number}. ${title}${warning}`.trim();
+  return page.number === 1 ? title || "Reading page 1." : `Page ${page.number}. ${title}`.trim();
 }
 
 function cameraMessage(kind: CameraErrorKind): string {

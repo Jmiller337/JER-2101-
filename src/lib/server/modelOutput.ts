@@ -242,7 +242,8 @@ export class ModelOutputParser {
     const language = normalizeLanguage(obj.language) ?? this.fallbackLanguage();
     const kind = cleanString(obj.kind, 60) || "other";
     const title = cleanString(obj.title, 400) || (status === "ok" ? DEFAULT_TITLE : "");
-    const warning = cleanString(obj.warning, 400);
+    // A "warning" the model may still write is dropped: remarks about the photo are never
+    // spoken. The problem line exists only for a page that could not be read at all.
     const problem = status === "retry" ? cleanString(obj.problem, 400) || DEFAULT_PROBLEM : "";
     return {
       type: "meta",
@@ -250,7 +251,6 @@ export class ModelOutputParser {
       language,
       kind,
       title,
-      ...(warning ? { warning } : {}),
       ...(problem ? { problem } : {}),
     };
   }

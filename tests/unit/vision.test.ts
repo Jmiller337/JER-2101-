@@ -101,6 +101,59 @@ describe("FramingTracker", () => {
     expect(last.kind).toBe("blurry");
   });
 
+  it("captures a page that stays cut off once the phone has been calm for three seconds", () => {
+    const tracker = new FramingTracker();
+    const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
+    const kinds: string[] = [];
+    for (let i = 0; i < 40; i++) kinds.push(tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100).kind);
+    expect(kinds[15]).toBe("cutOff");
+    expect(kinds[29]).toBe("cutOff");
+    expect(kinds[32]).toBe("ready");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 41 }), 4000)).toEqual({ kind: "ready", lenient: true });
+  });
+
+  it("stays calm through a slight hand tremor but not through real movement", () => {
+    const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
+    const tremor = new FramingTracker();
+    let last: Situation = { kind: "noPage" };
+    for (let i = 0; i < 40; i++) last = tremor.update(makeFrame({ page: cutOff, seed: i + 1, shift: i % 2 }), i * 100);
+    expect(last).toEqual({ kind: "ready", lenient: true });
+    const shaky = new FramingTracker();
+    for (let i = 0; i < 40; i++) last = shaky.update(makeFrame({ page: cutOff, seed: i + 1, shift: (i % 2) * 5 }), i * 100);
+    expect(last.kind).toBe("cutOff");
+    // A page sliding across the table is not calm either, however slowly it moves.
+    const sliding = new FramingTracker();
+    for (let i = 0; i < 40; i++) last = sliding.update(makeFrame({ page: cutOff, seed: i + 1, shift: -Math.floor(i / 2) }), i * 100);
+    expect(last.kind).toBe("cutOff");
+  });
+
+  it("never takes a lenient picture of an empty table, a very dark scene, or after it is turned off", () => {
+    const empty = new FramingTracker();
+    let last: Situation = { kind: "ready", lenient: false };
+    for (let i = 0; i < 40; i++) last = empty.update(makeFrame({ page: null, seed: i + 1 }), i * 100);
+    expect(last.kind).toBe("noPage");
+    const dark = new FramingTracker();
+    for (let i = 0; i < 40; i++) last = dark.update(makeFrame({ light: 0.15, seed: i + 1 }), i * 100);
+    expect(last.kind).toBe("dark");
+    const off = new FramingTracker();
+    off.calmMs = Infinity;
+    const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
+    for (let i = 0; i < 60; i++) last = off.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100);
+    expect(last.kind).toBe("cutOff");
+  });
+
+  it("restarts the calm clock after a capture that did not work out", () => {
+    const tracker = new FramingTracker();
+    const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
+    let last: Situation = { kind: "noPage" };
+    for (let i = 0; i < 35; i++) last = tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100);
+    expect(last.kind).toBe("ready");
+    tracker.resetSteady();
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 36 }), 3500).kind).toBe("cutOff");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 37 }), 5000).kind).toBe("cutOff");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 38 }), 6600).kind).toBe("ready");
+  });
+
   it("checks a captured still against the preview's sharpness", () => {
     const tracker = new FramingTracker();
     for (let i = 0; i < 10; i++) tracker.update(makeFrame({ seed: i + 1 }), i * 100);
@@ -117,8 +170,8 @@ describe("cues", () => {
   });
 
   it("asks for Capture when automatic capture is off", () => {
-    expect(cueFor({ kind: "ready" }, true)).toBeNull();
-    expect(cueFor({ kind: "ready" }, false)).toBe("I see the whole page. Press Capture.");
+    expect(cueFor({ kind: "ready", lenient: false }, true)).toBeNull();
+    expect(cueFor({ kind: "ready", lenient: false }, false)).toBe("I see the whole page. Press Capture.");
     expect(cueFor({ kind: "settling" }, true)).toBeNull();
   });
 });

@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useController, useFocusRequest } from "../hooks";
+import { EarIcon, SpeakerIcon } from "../icons";
 
 /**
  * First launch: "Do you use VoiceOver?" Two half-screen buttons: yes on top, no on the bottom,
@@ -12,25 +13,30 @@ export function ModeScreen() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useFocusRequest(headingRef, "heading");
   return (
-    <main className="flex min-h-dvh flex-col gap-4 bg-black p-4">
-      <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold text-white">
-        Do you use VoiceOver?
-      </h1>
+    <main className="flex min-h-dvh flex-col gap-4 bg-ink p-4 text-text">
+      <div className="px-1 pt-2">
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-extrabold tracking-tight">
+          Do you use VoiceOver?
+        </h1>
+        <p className="mt-1 text-lg text-muted">Tap the top half of the screen for yes, or the bottom half for no.</p>
+      </div>
       <button
         type="button"
         onClick={() => controller.chooseMode("voiceOver")}
-        className="flex flex-1 flex-col items-center justify-center rounded-3xl border-4 border-white bg-neutral-900 p-6 text-center text-4xl font-extrabold text-white"
+        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-line-2 bg-surface-2 p-6 text-center text-4xl font-extrabold tracking-tight text-text shadow-card active:scale-[0.99]"
       >
+        <EarIcon className="h-14 w-14 text-accent" />
         I use VoiceOver
-        <span className="mt-3 block text-xl font-normal">The app stays quiet and VoiceOver speaks.</span>
+        <span className="block text-xl font-normal text-muted">The app stays quiet and VoiceOver speaks.</span>
       </button>
       <button
         type="button"
         onClick={() => controller.chooseMode("readAloud")}
-        className="flex flex-1 flex-col items-center justify-center rounded-3xl border-4 border-yellow-300 bg-yellow-300 p-6 text-center text-4xl font-extrabold text-black"
+        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 p-6 text-center text-4xl font-extrabold tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
       >
+        <SpeakerIcon className="h-14 w-14" />
         Read aloud to me
-        <span className="mt-3 block text-xl font-normal">The app speaks everything itself.</span>
+        <span className="block text-xl font-normal">The app speaks everything itself.</span>
       </button>
     </main>
   );

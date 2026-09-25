@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useController, useFocusRequest, useStore } from "../hooks";
+import { LockIcon, SettingsIcon } from "../icons";
 import { Button } from "../ui";
 
 export function PasscodeScreen() {
@@ -13,12 +14,15 @@ export function PasscodeScreen() {
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
   return (
-    <main className="flex min-h-dvh flex-col gap-6 bg-black p-5 text-white">
-      <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-bold">
-        Enter the passcode
-      </h1>
+    <main className="flex min-h-dvh flex-col gap-6 bg-ink p-5 text-text">
+      <div className="flex items-center gap-3">
+        <LockIcon className="h-10 w-10 shrink-0 text-accent" />
+        <h1 ref={headingRef} tabIndex={-1} className="text-3xl font-extrabold tracking-tight">
+          Enter the passcode
+        </h1>
+      </div>
       <form
-        className="flex flex-col gap-6"
+        className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5 shadow-card"
         onSubmit={(event) => {
           event.preventDefault();
           void controller.submitPasscode(value);
@@ -38,22 +42,22 @@ export function PasscodeScreen() {
           value={value}
           onChange={(event) => setValue(event.target.value)}
           aria-describedby={passcodeError ? "passcode-error" : undefined}
-          className="min-h-16 rounded-2xl border-4 border-white bg-neutral-900 px-4 text-3xl text-white"
+          className="min-h-16 rounded-2xl border-2 border-line-2 bg-ink px-4 text-3xl text-text"
         />
         {passcodeError && (
-          <p id="passcode-error" ref={errorRef} tabIndex={-1} className="text-2xl font-semibold text-yellow-300">
+          <p id="passcode-error" ref={errorRef} tabIndex={-1} className="text-2xl font-semibold text-accent">
             {passcodeError}
           </p>
         )}
         <button
           type="submit"
           aria-disabled={passcodeBusy}
-          className="min-h-24 rounded-2xl border-4 border-yellow-300 bg-yellow-300 text-4xl font-extrabold text-black"
+          className="min-h-24 rounded-2xl border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 text-4xl font-extrabold tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
         >
           {passcodeBusy ? "Checking…" : "Continue"}
         </button>
       </form>
-      <Button label="Settings" size="normal" onClick={() => controller.openSettings()} className="self-start" />
+      <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} className="self-start" />
     </main>
   );
 }

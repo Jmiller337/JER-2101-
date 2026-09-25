@@ -3,6 +3,19 @@
 import { useEffect } from "react";
 import type { AppController } from "@/lib/client/controller";
 import { useController, useStore } from "./hooks";
+import {
+  FasterIcon,
+  NewDocumentIcon,
+  ParagraphDownIcon,
+  ParagraphUpIcon,
+  PauseIcon,
+  PlayIcon,
+  SettingsIcon,
+  SlowerIcon,
+  SpellIcon,
+  StepBackIcon,
+  StepForwardIcon,
+} from "./icons";
 import { Button } from "./ui";
 
 /**
@@ -20,36 +33,62 @@ export function ReaderControls({ extra }: { extra?: React.ReactNode }) {
   return (
     <nav
       aria-label="Reading controls"
-      className="sticky bottom-0 border-t-2 border-neutral-700 bg-neutral-950 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+      className="sticky bottom-0 border-t border-line bg-surface/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-card backdrop-blur-md"
     >
       <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
-        <Button label="Back" aria-label="Back one sentence" size="large" onClick={() => controller.back()} />
-        <Button label={active ? "Pause" : "Play"} variant="primary" size="large" onClick={() => controller.togglePlay()} />
-        <Button label="Forward" aria-label="Forward one sentence" size="large" onClick={() => controller.forward()} />
+        <Button
+          label="Back"
+          aria-label="Back one sentence"
+          icon={<StepBackIcon />}
+          layout="stacked"
+          size="large"
+          className="px-2 text-xl"
+          onClick={() => controller.back()}
+        />
+        <Button
+          label={active ? "Pause" : "Play"}
+          icon={active ? <PauseIcon /> : <PlayIcon />}
+          layout="stacked"
+          variant="primary"
+          size="large"
+          className="px-2"
+          onClick={() => controller.togglePlay()}
+        />
+        <Button
+          label="Forward"
+          aria-label="Forward one sentence"
+          icon={<StepForwardIcon />}
+          layout="stacked"
+          size="large"
+          className="px-2 text-xl"
+          onClick={() => controller.forward()}
+        />
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <Button label="Previous paragraph" size="normal" onClick={() => controller.previousParagraph()} />
-        <Button label="Next paragraph" size="normal" onClick={() => controller.nextParagraph()} />
+        <Button label="Previous paragraph" icon={<ParagraphUpIcon />} size="normal" onClick={() => controller.previousParagraph()} />
+        <Button label="Next paragraph" icon={<ParagraphDownIcon />} size="normal" onClick={() => controller.nextParagraph()} />
       </div>
       <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button label="Spell" aria-label="Spell the current sentence" size="normal" onClick={() => controller.spell()} />
+        <Button label="Spell" aria-label="Spell the current sentence" icon={<SpellIcon />} size="normal" onClick={() => controller.spell()} />
         <Button
           label="Slower"
           aria-label={`Slower, speed ${settings.rate.toFixed(1)}`}
+          icon={<SlowerIcon />}
           size="normal"
           onClick={() => controller.slower()}
         />
         <Button
           label="Faster"
           aria-label={`Faster, speed ${settings.rate.toFixed(1)}`}
+          icon={<FasterIcon />}
           size="normal"
           onClick={() => controller.faster()}
         />
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         {extra}
-        <Button label="New document" size="normal" onClick={() => controller.newDocument()} />
-        <Button label="Settings" size="normal" onClick={() => controller.openSettings()} />
+        <Button label="New document" icon={<NewDocumentIcon />} size="normal" onClick={() => controller.newDocument()} />
+        <Button label="Settings" icon={<SettingsIcon />} size="normal" onClick={() => controller.openSettings()} />
       </div>
     </nav>
   );

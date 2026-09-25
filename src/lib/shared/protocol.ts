@@ -55,7 +55,7 @@ export interface MetaEvent {
   language: string;
   kind: string;
   title: string;
-  warning?: string;
+  /** Only with status "retry": what the user should change before the next photo. */
   problem?: string;
 }
 
@@ -152,7 +152,7 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
       if (!isString(value.language, 2, LIMITS_TEXT.language)) return null;
       if (!isString(value.kind, 0, LIMITS_TEXT.kind)) return null;
       if (!isString(value.title, 0, LIMITS_TEXT.title)) return null;
-      if (!optionalString(value.warning, LIMITS_TEXT.title) || !optionalString(value.problem, LIMITS_TEXT.title)) return null;
+      if (!optionalString(value.problem, LIMITS_TEXT.title)) return null;
       const meta: MetaEvent = {
         type: "meta",
         status: value.status,
@@ -160,7 +160,6 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
         kind: value.kind,
         title: value.title,
       };
-      if (typeof value.warning === "string") meta.warning = value.warning;
       if (typeof value.problem === "string") meta.problem = value.problem;
       return meta;
     }

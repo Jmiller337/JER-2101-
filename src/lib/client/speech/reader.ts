@@ -5,7 +5,7 @@ import { chunkForSpeech, splitSentences } from "../text/sentences";
 import { spellChunks } from "../text/spell";
 import type { Speaker, Timers } from "./speaker";
 
-export type ItemKind = "title" | "warning" | "pageStart" | "content";
+export type ItemKind = "title" | "pageStart" | "content";
 
 export interface ReaderItem {
   id: number;
@@ -20,7 +20,7 @@ export interface ReaderItem {
   block: number | null;
   /** Index of the sentence within its block (content items only). */
   sentence: number | null;
-  /** First item of a paragraph-level unit: a block, or a title, warning, or page announcement. */
+  /** First item of a paragraph-level unit: a block, or a title or page announcement. */
   unitStart: boolean;
 }
 
@@ -105,15 +105,14 @@ export class Reader {
     return ACTIVE.has(this.status);
   }
 
-  /** A page's meta line arrived: add its title (page 1) or "Page N." and any warning. */
-  beginPage(page: number, meta: { title: string; warning?: string; language: string }): void {
+  /** A page's meta line arrived: add its title (page 1) or "Page N.". */
+  beginPage(page: number, meta: { title: string; language: string }): void {
     this.pages.set(page, { lang: meta.language, blockCount: 0, complete: false });
     if (page === 1) {
       if (meta.title) this.insert({ kind: "title", text: meta.title, lang: this.deps.uiLang, page });
     } else {
       this.insert({ kind: "pageStart", text: `Page ${page}.`, lang: this.deps.uiLang, page });
     }
-    if (meta.warning) this.insert({ kind: "warning", text: meta.warning, lang: this.deps.uiLang, page });
     this.itemsChanged();
   }
 

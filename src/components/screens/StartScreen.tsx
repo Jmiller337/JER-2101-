@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useController } from "../hooks";
+import { BrandMark, PlayIcon } from "../icons";
 
 /** Shared markup so the server-rendered page and the live screen look identical. */
 export function StartButtonMarkup({
@@ -12,15 +13,22 @@ export function StartButtonMarkup({
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col bg-black">
-      <h1 className="px-5 pt-5 text-2xl font-bold text-white">Document Reader</h1>
+    <main className="flex min-h-dvh flex-col bg-ink text-text">
+      <header className="flex items-center gap-4 px-6 pt-8">
+        <BrandMark className="h-14 w-14 shrink-0" />
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Document Reader</h1>
+          <p className="text-lg text-muted">Hold your phone over a page and listen.</p>
+        </div>
+      </header>
       <button
         ref={buttonRef}
         type="button"
         data-start="1"
         onClick={onStart}
-        className="m-4 flex flex-1 items-center justify-center rounded-3xl border-4 border-yellow-300 bg-yellow-300 px-6 text-center text-5xl font-extrabold leading-tight text-black"
+        className="m-4 mt-6 flex flex-1 flex-col items-center justify-center gap-5 rounded-[2rem] border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 px-6 text-center text-5xl font-extrabold leading-tight tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
       >
+        <PlayIcon className="h-16 w-16" />
         Start. Tap anywhere.
       </button>
     </main>
