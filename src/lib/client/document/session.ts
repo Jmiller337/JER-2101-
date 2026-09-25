@@ -1,5 +1,5 @@
 import { spokenError } from "@/lib/shared/messages";
-import type { ErrorCode, MetaEvent } from "@/lib/shared/protocol";
+import type { ErrorCode, MetaEvent, ReadRequest } from "@/lib/shared/protocol";
 import { ApiError, isAbortError, type ApiClient } from "../api";
 import type { PreparedImage } from "../camera/prepare";
 import type { StorageLike } from "../storage";
@@ -26,6 +26,14 @@ export interface SessionState {
   awaitingPage: number | null;
   /** Number of page reads in flight. */
   activeReads: number;
+  /** A PDF is being read: its later pages are still to come, so no page may be added. */
+  readingPdf: boolean;
+}
+
+/** A PDF picked from the phone's files, as base64. */
+export interface PreparedPdf {
+  base64: string;
+  bytes: number;
 }
 
 /**
@@ -44,7 +52,13 @@ export class DocumentSession {
       storage: StorageLike | null;
     },
   ) {
-    this.store = new Store<SessionState>({ doc: loadDoc(deps.storage), version: 0, awaitingPage: null, activeReads: 0 });
+    this.store = new Store<SessionState>({
+      doc: loadDoc(deps.storage),
+      version: 0,
+      awaitingPage: null,
+      activeReads: 0,
+      readingPdf: false,
+    });
   }
 
   get doc(): Doc | null {
@@ -59,6 +73,10 @@ export class DocumentSession {
     return this.store.get().activeReads > 0;
   }
 
+  get readingPdf(): boolean {
+    return this.store.get().readingPdf;
+  }
+
   get awaitingFirstLine(): boolean {
     return this.store.get().awaitingPage !== null;
   }
@@ -66,7 +84,7 @@ export class DocumentSession {
   newDocument(): void {
     for (const abort of this.aborts) abort.abort();
     this.aborts.clear();
-    this.store.set((s) => ({ doc: null, version: s.version + 1, awaitingPage: null, activeReads: 0 }));
+    this.store.set((s) => ({ doc: null, version: s.version + 1, awaitingPage: null, activeReads: 0, readingPdf: false }));
     clearDoc(this.deps.storage);
   }
 
@@ -84,7 +102,22 @@ export class DocumentSession {
     this.changed();
   }
 
-  async readPage(image: PreparedImage, cb: PageReadCallbacks): Promise<ReadOutcome> {
+  /** Reads one photographed page. */
+  readPage(image: PreparedImage, cb: PageReadCallbacks): Promise<ReadOutcome> {
+    return this.read({ image: { mediaType: image.mediaType, data: image.base64 } }, image.blob ?? null, cb);
+  }
+
+  /** Reads a whole PDF: its pages arrive one after another in the same stream. */
+  readPdf(pdf: PreparedPdf, cb: PageReadCallbacks): Promise<ReadOutcome> {
+    return this.read({ pdf: { data: pdf.base64 } }, null, cb);
+  }
+
+  private async read(
+    source: Pick<ReadRequest, "image" | "pdf">,
+    imageBlob: Blob | null,
+    cb: PageReadCallbacks,
+  ): Promise<ReadOutcome> {
+    const isPdf = Boolean(source.pdf);
     const pageNumber = this.nextPageNumber;
     const passcode = this.deps.passcode();
     if (!passcode) {
@@ -93,9 +126,14 @@ export class DocumentSession {
     }
     const abort = new AbortController();
     this.aborts.add(abort);
-    this.store.update({ awaitingPage: pageNumber, activeReads: this.store.get().activeReads + 1 });
+    this.store.update({
+      awaitingPage: pageNumber,
+      activeReads: this.store.get().activeReads + 1,
+      ...(isPdf ? { readingPdf: true } : {}),
+    });
 
     let page: DocPage | null = null;
+    let meta: MetaEvent | null = null;
     let outcome: ReadOutcome = "error";
     const clearAwaiting = () => {
       if (this.store.get().awaitingPage === pageNumber) this.store.update({ awaitingPage: null });
@@ -104,7 +142,7 @@ export class DocumentSession {
     try {
       await this.deps.api.readPage(
         {
-          image: { mediaType: image.mediaType, data: image.base64 },
+          ...source,
           pageNumber,
           languageHint: this.doc?.language ?? null,
         },
@@ -120,6 +158,7 @@ export class DocumentSession {
                 cb.onRetry(event.problem ?? spokenError("empty"));
                 return;
               }
+              meta = event;
               page = {
                 number: pageNumber,
                 language: event.language,
@@ -127,10 +166,30 @@ export class DocumentSession {
                 title: event.title,
                 blocks: [],
                 complete: false,
-                ...(image.blob ? { image: image.blob } : {}),
+                ...(imageBlob ? { image: imageBlob } : {}),
+                ...(isPdf ? { fromPdf: true } : {}),
               };
               this.addPage(page);
               cb.onPageStart(page, event);
+              return;
+            }
+            case "page": {
+              // The next page of a PDF: the one before it is complete.
+              if (!page || !meta || !isPdf || event.number <= page.number) return;
+              page.complete = true;
+              this.changed();
+              cb.onPageDone(page);
+              page = {
+                number: event.number,
+                language: page.language,
+                kind: page.kind,
+                title: "",
+                blocks: [],
+                complete: false,
+                fromPdf: true,
+              };
+              this.addPage(page);
+              cb.onPageStart(page, { ...meta, title: "" });
               return;
             }
             case "block": {
@@ -180,7 +239,10 @@ export class DocumentSession {
       this.aborts.delete(abort);
       if (!abort.signal.aborted) {
         clearAwaiting();
-        this.store.update({ activeReads: Math.max(0, this.store.get().activeReads - 1) });
+        this.store.update({
+          activeReads: Math.max(0, this.store.get().activeReads - 1),
+          ...(isPdf ? { readingPdf: false } : {}),
+        });
       }
     }
     return abort.signal.aborted ? "aborted" : outcome;

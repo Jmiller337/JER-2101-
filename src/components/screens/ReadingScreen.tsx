@@ -32,7 +32,7 @@ export function ReadingScreen() {
   const kind = doc?.pages[0]?.kind;
   // A page whose read stopped part way can be photographed again, as long as it is the last page.
   const lastPage = doc?.pages[doc.pages.length - 1];
-  const retakeNumber = lastPage?.failed && session.activeReads === 0 ? lastPage.number : null;
+  const retakeNumber = lastPage?.failed && !lastPage.fromPdf && session.activeReads === 0 ? lastPage.number : null;
 
   return (
     <main className="flex min-h-dvh flex-col bg-ink text-text">
@@ -57,7 +57,7 @@ export function ReadingScreen() {
             {ui.errorText}
           </p>
         )}
-        <div className="rounded-card border border-line bg-surface p-5 shadow-card">
+        <div className="rounded-card border border-line bg-surface p-5">
           {doc ? (
             <Transcript doc={doc} version={session.version} current={appVoice ? reader.current : null} plain={!appVoice} />
           ) : (

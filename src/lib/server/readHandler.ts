@@ -10,28 +10,46 @@ import type { HandlerDeps } from "./deps";
 import { classifyModelError, describeError } from "./errors";
 import { jsonResponse, NDJSON_HEADERS } from "./http";
 import { ModelOutputParser } from "./modelOutput";
-import { READ_SYSTEM_PROMPT, readUserText } from "./prompts";
+import { READ_PDF_SYSTEM_PROMPT, READ_SYSTEM_PROMPT, readPdfUserText, readUserText } from "./prompts";
 
-/** The Messages API request for reading one page (PROMPT.md sections 6.5 and 7). */
+/** The Messages API request for reading one page or one PDF (PROMPT.md sections 6.5 and 7). */
 export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamParams {
-  return {
+  const common = {
     model: env.readModel,
-    max_tokens: LIMITS.maxTokens,
     betas: [FALLBACK_BETA],
-    fallbacks: "default",
+    fallbacks: "default" as const,
     // Full effort: a page must be transcribed to the last line. Lower settings shorten the
     // output, which for a transcription means words left out.
-    output_config: { effort: "high" },
+    output_config: { effort: "high" as const },
+  };
+  if (request.pdf) {
+    return {
+      ...common,
+      max_tokens: LIMITS.maxPdfTokens,
+      system: READ_PDF_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            // The document first, then the instruction.
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: request.pdf.data } },
+            { type: "text", text: readPdfUserText(request.languageHint) },
+          ],
+        },
+      ],
+    };
+  }
+  const image = request.image!;
+  return {
+    ...common,
+    max_tokens: LIMITS.maxTokens,
     system: READ_SYSTEM_PROMPT,
     messages: [
       {
         role: "user",
         content: [
           // Image first, then the instruction.
-          {
-            type: "image",
-            source: { type: "base64", media_type: request.image.mediaType, data: request.image.data },
-          },
+          { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
           { type: "text", text: readUserText(request.pageNumber, request.languageHint) },
         ],
       },
@@ -57,7 +75,7 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
     deps.log({ route: "read", outcome: "error", code: "not_configured", ms: elapsed() });
     return jsonResponse(500, { error: "not_configured", message: spokenError("not_configured") });
   }
-  const body = await readJsonBody(req, LIMITS.maxBodyBytes);
+  const body = await readJsonBody(req, LIMITS.maxReadBodyBytes);
   if (!body.ok) {
     deps.log({ route: "read", outcome: "rejected", code: body.error, ms: elapsed() });
     return jsonResponse(body.status, { error: body.error, message: spokenError(body.error) });
@@ -71,7 +89,11 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
 
   const abort = new AbortController();
   req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
-  const parser = new ModelOutputParser({ languageHint: request.languageHint });
+  const parser = new ModelOutputParser({
+    languageHint: request.languageHint,
+    firstPage: request.pageNumber,
+    multiPage: Boolean(request.pdf),
+  });
   const encoder = new TextEncoder();
   let firstEventMs: number | null = null;
 
@@ -138,7 +160,9 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
         blocks: stats.blocks,
         dropped: stats.dropped,
         parserMode: stats.mode,
-        imageChars: request.image.data.length,
+        imageChars: request.image?.data.length,
+        pdfChars: request.pdf?.data.length,
+        pages: stats.pages,
       });
       if (open) {
         open = false;

@@ -12,6 +12,8 @@ export interface RequestLog {
   cacheReadTokens?: number | null;
   cacheWriteTokens?: number | null;
   blocks?: number;
+  pages?: number;
+  pdfChars?: number;
   dropped?: number;
   parserMode?: string;
   imageChars?: number;

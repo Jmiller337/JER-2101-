@@ -7,7 +7,7 @@ type Size = "huge" | "large" | "normal";
 
 const VARIANTS: Record<Variant, string> = {
   // Near-black on amber: about 13:1.
-  primary: "bg-linear-to-b from-accent to-accent-2 text-on-accent border-2 border-accent-2 shadow-glow",
+  primary: "bg-accent text-on-accent border-2 border-accent",
   // Off-white on slate: about 14:1.
   secondary: "bg-surface-2 text-text border-2 border-line-2",
   quiet: "bg-transparent text-text border-2 border-line",

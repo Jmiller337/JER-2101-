@@ -81,6 +81,15 @@ describe("voice quality", () => {
 });
 
 describe("settings", () => {
+  it("keeps a valid colour theme and defaults to Light", () => {
+    const storage = new MemoryStorage();
+    expect(loadSettings(storage).theme).toBe("light");
+    saveSettings(storage, { ...DEFAULT_SETTINGS, theme: "contrast" });
+    expect(loadSettings(storage).theme).toBe("contrast");
+    storage.setItem("docreader.settings.v1", JSON.stringify({ ...DEFAULT_SETTINGS, theme: "purple" }));
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
+  });
+
   it("round-trips and clamps the rate", () => {
     const storage = new MemoryStorage();
     saveSettings(storage, { ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 1.5, sounds: false });

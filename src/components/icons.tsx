@@ -119,6 +119,15 @@ export const AddPageIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const PdfIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6 3h8l4 4v14H6z" />
+    <path d="M14 3v4h4" />
+    <path d="M9 11h6M9 14h6" />
+    <rect x="8" y="16.5" width="8" height="2.5" rx="0.8" fill="currentColor" stroke="none" />
+  </Icon>
+);
+
 export const NewDocumentIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M6 3h8l4 4v14H6z" />
@@ -194,9 +203,11 @@ export const CheckIcon = (p: IconProps) => (
 /** The app's mark: a page with sound leaving it. */
 export const BrandMark = ({ className = "h-12 w-12" }: IconProps) => (
   <svg aria-hidden="true" focusable="false" viewBox="0 0 64 64" className={className}>
-    <rect x="4" y="4" width="56" height="56" rx="16" fill="#ffd166" />
-    <path d="M20 18h14l8 8v20H20z" fill="none" stroke="#191100" strokeWidth="4" strokeLinejoin="round" />
-    <path d="M34 18v8h8" fill="none" stroke="#191100" strokeWidth="4" strokeLinejoin="round" />
-    <path d="M26 33h12M26 39h12" stroke="#191100" strokeWidth="4" strokeLinecap="round" />
+    <rect x="4" y="4" width="56" height="56" rx="14" className="fill-accent" />
+    <g fill="none" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" className="stroke-on-accent">
+      <path d="M20 18h14l8 8v20H20z" />
+      <path d="M34 18v8h8" />
+      <path d="M26 33h12M26 39h12" />
+    </g>
   </svg>
 );

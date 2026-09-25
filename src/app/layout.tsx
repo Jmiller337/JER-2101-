@@ -15,16 +15,30 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0b0f1a",
+  themeColor: "#f4f4f0",
 };
 
 /**
- * Runs before the app's own code, in syntax every browser understands. If the app never starts
- * (a phone too old for its code, or a download that failed), tapping Start explains that out
- * loud instead of doing nothing. Once the app is running it sets `__docreaderReady` and this
- * script stays out of the way.
+ * Runs before the app's own code, in syntax every browser understands.
+ * - Applies the saved colour theme before the first paint, so the page never flashes.
+ * - Shows focus rings only to keyboard users (a Bluetooth keyboard); touch and VoiceOver users
+ *   never see a box drawn around the heading the app moves focus to.
+ * - If the app never starts (a phone too old for its code, or a download that failed), tapping
+ *   Start explains that out loud instead of doing nothing. Once the app is running it sets
+ *   `__docreaderReady` and this part stays out of the way.
  */
 const STARTUP_FALLBACK = `(function () {
+  var root = document.documentElement;
+  try {
+    var saved = JSON.parse(window.localStorage.getItem("docreader.settings.v1") || "null");
+    if (saved && (saved.theme === "light" || saved.theme === "dark" || saved.theme === "contrast")) {
+      root.setAttribute("data-theme", saved.theme);
+    }
+  } catch (e) {}
+  document.addEventListener("keydown", function (event) {
+    if (!event.metaKey && !event.ctrlKey && !event.altKey) root.setAttribute("data-keyboard", "1");
+  }, true);
+  document.addEventListener("pointerdown", function () { root.removeAttribute("data-keyboard"); }, true);
   var loadedAt = 0;
   var broken = false;
   window.addEventListener("load", function () { loadedAt = Date.now(); });
@@ -39,7 +53,7 @@ const STARTUP_FALLBACK = `(function () {
       region = document.createElement("div");
       region.id = "startup-status";
       region.setAttribute("role", "alert");
-      region.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:50;padding:16px;background:#0b0f1a;color:#ffd166;font:bold 24px/1.3 system-ui,sans-serif";
+      region.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:50;padding:16px;background:#000;color:#ffe600;font:bold 24px/1.3 system-ui,sans-serif";
       document.body.appendChild(region);
     }
     region.textContent = text;
@@ -66,7 +80,8 @@ const STARTUP_FALLBACK = `(function () {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    // The start-up script sets data-theme and data-keyboard on <html> before React loads.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: STARTUP_FALLBACK }} />
       </head>

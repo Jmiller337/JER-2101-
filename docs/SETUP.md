@@ -168,4 +168,5 @@ The server logs one line per request with timings, token counts, and the outcome
 | The first page takes a long time after a pause (Fly.io) | The server was asleep. See `min_machines_running` above. |
 | Reading is slow | Switch to Claude Sonnet 5 (section 5). |
 | Tapping Start says "This app could not start…" | Check the internet connection and reload the page. If it keeps happening, update the iPhone (Settings, General, Software Update): the app needs iOS 16 or newer. |
+| "That PDF is too large." | PDFs up to 15 MB are accepted. On Vercel the limit is lower (about 3 MB, because Vercel accepts request bodies up to 4.5 MB); Fly.io takes the full 15 MB. |
 | Tapping Start says "Still loading. Tap again in a moment." | The app is still downloading on a slow connection. Wait a few seconds and tap again. |

@@ -126,6 +126,29 @@ const PAGE_TWO = [
   { type: "done", blocks: 3 },
 ];
 
+/** A two-page PDF: the page line between the pages is what the real model writes too. */
+const PDF_DOCUMENT = [
+  {
+    type: "meta",
+    status: "ok",
+    language: "en",
+    kind: "letter",
+    title: "A two-page letter from Riverside Library about a returned book",
+  },
+  { type: "block", kind: "heading", text: "Riverside Library" },
+  { type: "block", kind: "paragraph", text: "Dear Ms. Alvarez, thank you for returning The Long Road." },
+  { type: "block", kind: "paragraph", text: "The book was returned on September 3, 2026, eight days late." },
+  { type: "page" },
+  { type: "block", kind: "label_value", text: "Late fee: $2.40." },
+  { type: "block", kind: "paragraph", text: "You can pay at the front desk or by phone at 555-0199." },
+  { type: "done", blocks: 5 },
+];
+
+function pdfScript(): FakeScript {
+  const lines = PDF_DOCUMENT.map((line) => JSON.stringify(line)).join("\n");
+  return { chunks: chunkText(`${lines}\n`), delayMs: 25, usage: { input_tokens: 6100, output_tokens: 260 } };
+}
+
 function readScript(pageNumber: number): FakeScript {
   const lines = (pageNumber % 2 === 1 ? PAGE_ONE : PAGE_TWO).map((line) => JSON.stringify(line)).join("\n");
   return { chunks: chunkText(`${lines}\n`), delayMs: 25, usage: { input_tokens: 4300, output_tokens: 320 } };
@@ -145,6 +168,9 @@ export function createFakeModelClient(): ModelClient {
     stream(params: StreamParams, options?: { signal?: AbortSignal }): ModelStream {
       const first = params.messages[0];
       const content = Array.isArray(first?.content) ? first.content : [];
+      if (content.some((part) => part.type === "document")) {
+        return new FakeModelStream(pdfScript(), options?.signal, params.model);
+      }
       const hasImage = content.some((part) => part.type === "image");
       if (hasImage) {
         const text = content.find((part) => part.type === "text");

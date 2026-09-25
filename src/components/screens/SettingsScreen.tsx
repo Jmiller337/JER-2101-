@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { RATE_MAX, RATE_MIN, RATE_STEP } from "@/lib/client/settings";
+import { RATE_MAX, RATE_MIN, RATE_STEP, THEME_NAMES, type Theme } from "@/lib/client/settings";
 import { betterVoiceAvailable } from "@/lib/client/speech/voices";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { BackIcon, FasterIcon, SlowerIcon, SpeakerIcon } from "../icons";
@@ -64,6 +64,22 @@ export function SettingsScreen() {
           variant={!readAloud ? "primary" : "secondary"}
           onClick={() => controller.setMode("voiceOver")}
         />
+      </Section>
+
+      <Section id="colours" title="Colours">
+        <div className="grid grid-cols-1 gap-3">
+          {(Object.keys(THEME_NAMES) as Theme[]).map((theme) => (
+            <Button
+              key={theme}
+              label={THEME_NAMES[theme]}
+              aria-pressed={settings.theme === theme}
+              icon={<Swatch theme={theme} />}
+              variant={settings.theme === theme ? "primary" : "secondary"}
+              className="justify-start"
+              onClick={() => controller.setTheme(theme)}
+            />
+          ))}
+        </div>
       </Section>
 
       <Section id="voice" title="Voice">
@@ -161,7 +177,7 @@ export function SettingsScreen() {
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-heading`} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4 shadow-card">
+    <section aria-labelledby={`${id}-heading`} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4">
       <h2 id={`${id}-heading`} className="text-2xl font-bold tracking-tight">
         {title}
       </h2>
@@ -178,18 +194,35 @@ function SwitchButton({ label, on, onToggle }: { label: string; on: boolean; onT
       aria-checked={on}
       onClick={onToggle}
       className={`flex min-h-16 items-center justify-between gap-4 rounded-2xl border-2 px-5 text-2xl font-bold ${
-        on ? "border-accent-2 bg-surface-3 text-text" : "border-line-2 bg-surface-2 text-text"
+        on ? "border-accent bg-surface-3 text-text" : "border-line-2 bg-surface-2 text-text"
       }`}
     >
       <span>{label}</span>
       <span aria-hidden="true" className="flex shrink-0 items-center gap-3">
         <span className="text-lg font-semibold text-muted">{on ? "On" : "Off"}</span>
-        <span className={`relative h-9 w-16 rounded-full border-2 transition-colors ${on ? "border-accent-2 bg-accent" : "border-line-2 bg-ink"}`}>
+        <span className={`relative h-9 w-16 rounded-full border-2 transition-colors ${on ? "border-accent bg-accent" : "border-line-2 bg-ink"}`}>
           <span
             className={`absolute top-1 left-1 h-6 w-6 rounded-full transition-transform ${on ? "translate-x-7 bg-on-accent" : "bg-text"}`}
           />
         </span>
       </span>
     </button>
+  );
+}
+
+/** A small preview of a theme: its page colour with its button colour on top. */
+const SWATCHES: Record<Theme, { page: string; button: string }> = {
+  light: { page: "#f4f4f0", button: "#1d3d9e" },
+  dark: { page: "#000000", button: "#9cc1ff" },
+  contrast: { page: "#000000", button: "#ffe600" },
+};
+
+function Swatch({ theme }: { theme: Theme }) {
+  const { page, button } = SWATCHES[theme];
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="1.5" y="1.5" width="21" height="21" rx="5" fill={page} stroke="#8a8a80" strokeWidth="1.5" />
+      <rect x="6" y="9" width="12" height="6" rx="2" fill={button} />
+    </svg>
   );
 }

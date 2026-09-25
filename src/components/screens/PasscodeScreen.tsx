@@ -22,7 +22,7 @@ export function PasscodeScreen() {
         </h1>
       </div>
       <form
-        className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5 shadow-card"
+        className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5"
         onSubmit={(event) => {
           event.preventDefault();
           void controller.submitPasscode(value);
@@ -52,7 +52,7 @@ export function PasscodeScreen() {
         <button
           type="submit"
           aria-disabled={passcodeBusy}
-          className="min-h-24 rounded-2xl border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 text-4xl font-extrabold tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
+          className="min-h-24 rounded-2xl border-2 border-accent bg-accent text-4xl font-extrabold tracking-tight text-on-accent active:scale-[0.99]"
         >
           {passcodeBusy ? "Checking…" : "Continue"}
         </button>

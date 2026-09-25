@@ -28,6 +28,8 @@ export interface ParserStats {
   blocks: number;
   dropped: number;
   metaStatus: "ok" | "retry" | null;
+  /** Pages read (more than one only for a PDF). */
+  pages: number;
 }
 
 /**
@@ -50,8 +52,20 @@ export class ModelOutputParser {
   private dropped = 0;
   private paragraph: string[] = [];
   private closed = false;
+  private page: number;
+  private blocksOnPage = 0;
 
-  constructor(private readonly opts: { languageHint?: string | null } = {}) {}
+  constructor(
+    private readonly opts: {
+      languageHint?: string | null;
+      /** The document page number of the first page read. */
+      firstPage?: number;
+      /** A PDF: the model's page lines start new pages. Ignored for a photo. */
+      multiPage?: boolean;
+    } = {},
+  ) {
+    this.page = opts.firstPage ?? 1;
+  }
 
   push(text: string): ReadEvent[] {
     if (this.closed) return [];
@@ -85,7 +99,14 @@ export class ModelOutputParser {
   }
 
   get stats(): ParserStats {
-    return { mode: this.mode, blocks: this.blocks, dropped: this.dropped, metaStatus: this.metaStatus };
+    const firstPage = this.opts.firstPage ?? 1;
+    return {
+      mode: this.mode,
+      blocks: this.blocks,
+      dropped: this.dropped,
+      metaStatus: this.metaStatus,
+      pages: this.metaSent ? this.page - firstPage + 1 : 0,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -170,6 +191,19 @@ export class ModelOutputParser {
       for (const block of blocks) this.emitBlock(block, out);
       return true;
     }
+    if (obj.type === "page") {
+      // A new page starts only when the page before it has text, so a page line before the
+      // first block (or two in a row) never makes an empty page.
+      if (!this.opts.multiPage || !this.metaSent || this.metaStatus === "retry" || this.blocksOnPage === 0) {
+        this.dropped += 1;
+        return true;
+      }
+      if (this.mode === "plaintext") this.flushParagraph(out);
+      this.page += 1;
+      this.blocksOnPage = 0;
+      out.push({ type: "page", number: this.page });
+      return true;
+    }
     if (obj.type === "done") return true;
     return false;
   }
@@ -182,6 +216,7 @@ export class ModelOutputParser {
 
   private emitBlock(block: BlockEvent, out: ReadEvent[]): void {
     this.blocks += 1;
+    this.blocksOnPage += 1;
     out.push(block);
   }
 

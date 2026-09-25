@@ -4,7 +4,10 @@
  * Then asks two questions about the page through the ask handler; the second should read the
  * transcript from the prompt cache (if the page is long enough to be cached).
  *
- *   ANTHROPIC_API_KEY=... npm run check:real-api [path/to/photo.jpg]
+ *   ANTHROPIC_API_KEY=... npm run check:real-api [path/to/photo.jpg or path/to/file.pdf]
+ *
+ * A PDF (for example tests/fixtures/pages/letter.pdf) is sent the way "Open a PDF" sends it,
+ * and each page break is printed as a "page" line.
  *
  * Costs a few cents per run. Uses READ_MODEL and ASK_MODEL if set, otherwise the default model.
  */
@@ -31,7 +34,9 @@ async function main(): Promise<void> {
   }
   const file = process.argv[2] ?? "tests/fixtures/pages/letter-photo.jpg";
   const data = readFileSync(file).toString("base64");
+  const isPdf = file.toLowerCase().endsWith(".pdf");
   const mediaType = file.endsWith(".png") ? "image/png" : file.endsWith(".webp") ? "image/webp" : "image/jpeg";
+  const source = isPdf ? { pdf: { data } } : { image: { mediaType, data } };
   const logs: RequestLog[] = [];
   const env = { ...serverEnv(), passcode: "local-check" };
   const client = dryRun ? createFakeModelClient() : createAnthropicModelClient();
@@ -41,7 +46,7 @@ async function main(): Promise<void> {
   const request = new Request("http://localhost/api/read", {
     method: "POST",
     headers: { authorization: "Bearer local-check", "content-type": "application/json" },
-    body: JSON.stringify({ image: { mediaType, data }, pageNumber: 1, languageHint: null }),
+    body: JSON.stringify({ ...source, pageNumber: 1, languageHint: null }),
   });
 
   console.log(`Reading ${file} with ${env.readModel} (${Math.round(data.length / 1024)} KB of base64)...\n`);
@@ -76,7 +81,9 @@ async function main(): Promise<void> {
         firstBlock ??= ms;
         blocks.push(event.text ?? "");
       }
-      const detail = event.type === "block" ? event.text : event.type === "meta" ? `${event.status}: ${event.title}` : line;
+      const detail =
+        event.type === "block" ? event.text : event.type === "meta" ? `${event.status}: ${event.title}` : line;
+      if (event.type === "page") blocks.push("");
       console.log(`${String(ms).padStart(6)} ms  ${event.type.padEnd(5)}  ${detail}`);
     }
   }
@@ -91,7 +98,7 @@ async function main(): Promise<void> {
     console.log(`  tokens: ${log.inputTokens} in, ${log.outputTokens} out; about $${cost.toFixed(4)}`);
   }
 
-  if (blocks.length === 0) return;
+  if (blocks.length === 0 || isPdf) return;
   const history: Array<{ role: "user" | "assistant"; content: string }> = [];
   for (const question of ["How much do I owe, and when is it due?", "What phone number can I call?"]) {
     const askLogs: RequestLog[] = [];

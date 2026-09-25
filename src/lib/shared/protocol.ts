@@ -30,6 +30,10 @@ export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 /** Largest base64 image string accepted (about 7.5 MB decoded; the body cap is 6 MB anyway). */
 export const MAX_IMAGE_BASE64_CHARS = 10_000_000;
 
+/** Largest PDF the phone sends: 15 MB, which is 20 million characters of base64. */
+export const MAX_PDF_BYTES = 15 * 1024 * 1024;
+export const MAX_PDF_BASE64_CHARS = Math.ceil(MAX_PDF_BYTES / 3) * 4;
+
 /** Limits on POST /api/ask bodies, shared so the phone never sends what the server rejects. */
 export const ASK_LIMITS = {
   question: 2000,
@@ -76,7 +80,13 @@ export interface ErrorEvent {
   message: string;
 }
 
-export type ReadEvent = MetaEvent | BlockEvent | DoneEvent | ErrorEvent;
+/** A PDF read moves on to its next page; the blocks that follow belong to page `number`. */
+export interface PageEvent {
+  type: "page";
+  number: number;
+}
+
+export type ReadEvent = MetaEvent | BlockEvent | PageEvent | DoneEvent | ErrorEvent;
 
 // ---------------------------------------------------------------------------
 // Streamed events from POST /api/ask
@@ -97,8 +107,11 @@ export type AskEvent = AskTextEvent | AskDoneEvent | ErrorEvent;
 // Request bodies (validated on the server by src/lib/server/schemas.ts)
 // ---------------------------------------------------------------------------
 
+/** One photo of one page (`image`), or a PDF with any number of pages (`pdf`): exactly one. */
 export interface ReadRequest {
-  image: { mediaType: ImageMediaType; data: string };
+  image?: { mediaType: ImageMediaType; data: string };
+  pdf?: { data: string };
+  /** The number the first page read will get in the document. */
   pageNumber: number;
   languageHint?: string | null;
 }
@@ -166,6 +179,9 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
     case "block":
       if (!includes(BLOCK_KINDS, value.kind) || !isString(value.text, 1, LIMITS_TEXT.blockText)) return null;
       return { type: "block", kind: value.kind, text: value.text };
+    case "page":
+      if (typeof value.number !== "number" || !Number.isInteger(value.number) || value.number < 2 || value.number > 5000) return null;
+      return { type: "page", number: value.number };
     case "done":
       if (typeof value.blocks !== "number" || !Number.isInteger(value.blocks) || value.blocks < 0) return null;
       return { type: "done", blocks: value.blocks };

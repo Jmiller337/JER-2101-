@@ -10,6 +10,7 @@ export interface SeedSettings {
   autoCapture?: boolean;
   guidance?: "full" | "minimal";
   sounds?: boolean;
+  theme?: "light" | "dark" | "contrast";
 }
 
 /**

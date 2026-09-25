@@ -1,14 +1,14 @@
 import { CAMERA_MESSAGES, spokenError } from "@/lib/shared/messages";
-import { ASK_LIMITS, type ChatTurn, type ErrorCode, type MetaEvent } from "@/lib/shared/protocol";
+import { ASK_LIMITS, MAX_PDF_BYTES, type ChatTurn, type ErrorCode, type MetaEvent } from "@/lib/shared/protocol";
 import { Announcer, type AnnounceOptions, type Channel } from "./announce/announcer";
 import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
 import { Sounds } from "./audio/sounds";
 import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
 import { FrameSampler } from "./camera/frameSampler";
-import { imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
+import { blobToBase64, imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
 import { docToAskPages, type Doc, type DocPage } from "./document/model";
-import { DocumentSession } from "./document/session";
+import { DocumentSession, type PageReadCallbacks, type PreparedPdf } from "./document/session";
 import {
   clampRate,
   forgetPasscode,
@@ -19,6 +19,8 @@ import {
   saveSettings,
   type Mode,
   type Settings,
+  THEME_NAMES,
+  type Theme,
 } from "./settings";
 import { BrowserSpeechPort, type SpeechPort, type VoiceInfo } from "./speech/port";
 import { Listener, recognitionAvailable } from "./speech/recognition";
@@ -610,14 +612,48 @@ export class AppController {
     console.info("captured", { width: image.width, height: image.height, bytes: image.bytes });
     this.say("Got it. Reading.");
     this.ui.update({ capturing: false });
-    this.startPageRead(image);
+    this.startPageRead({ image });
+  }
+
+  /** A PDF picked from the phone's files ("Open a PDF"). All its pages are read in order. */
+  async openPdf(file: File): Promise<void> {
+    if (this.ui.get().capturing) return;
+    if (this.session.readingPdf || this.session.awaitingFirstLine) {
+      this.notify("Wait a moment, I'm still reading.");
+      return;
+    }
+    if (!isPdfFile(file)) {
+      this.fail("That file is not a PDF. Choose a file whose name ends in .pdf.");
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      this.fail("That PDF is too large. The limit is 15 megabytes.");
+      return;
+    }
+    this.armed = false;
+    this.lastCaptureAutomatic = false;
+    this.autoRetries = 0;
+    this.ui.update({ capturing: true });
+    let pdf: PreparedPdf;
+    try {
+      pdf = { base64: await blobToBase64(file), bytes: file.size };
+    } catch (err) {
+      this.ui.update({ capturing: false });
+      this.armed = true;
+      this.fail("I couldn't open that PDF. Please try again.", err instanceof Error ? err.message : undefined);
+      return;
+    }
+    console.info("pdf opened", { bytes: pdf.bytes });
+    this.say("Got it. Reading the PDF.");
+    this.ui.update({ capturing: false });
+    this.startPageRead({ pdf });
   }
 
   // -------------------------------------------------------------------------
   // Reading a page
   // -------------------------------------------------------------------------
 
-  private startPageRead(image: PreparedImage): void {
+  private startPageRead(source: { image: PreparedImage } | { pdf: PreparedPdf }): void {
     const retake = this.retakeTarget;
     this.retakeTarget = null;
     if (retake !== null) {
@@ -641,7 +677,23 @@ export class AppController {
       this.startLoadingTicker();
     }
 
-    const read = this.session.readPage(image, {
+    const isPdf = "pdf" in source;
+    const callbacks = this.pageReadCallbacks(adding, pageNumber, isPdf);
+    const read = (isPdf ? this.session.readPdf(source.pdf, callbacks) : this.session.readPage(source.image, callbacks)).then(
+      (outcome) => {
+        // A PDF read to the end in VoiceOver mode: say once that every page is there.
+        const pages = this.session.doc?.pages.filter((p) => p.fromPdf && p.number >= pageNumber).length ?? 0;
+        if (isPdf && outcome === "ok" && pages > 1 && !this.appVoiceActive) this.say(`All ${pages} pages are ready.`);
+      },
+    );
+    // The session counts a read as finished only after its stream closes; then the reader knows
+    // no more text is coming and can announce the end of the document.
+    void read.then(() => this.reader.setLoading(this.session.isReading));
+  }
+
+  /** What happens as a page read (or a PDF read, page by page) streams in. */
+  private pageReadCallbacks(adding: boolean, pageNumber: number, isPdf: boolean): PageReadCallbacks {
+    return {
       onRetry: (problem) => {
         this.stopLoadingTicker();
         this.quietReaderAfterFailedCapture(adding);
@@ -658,14 +710,17 @@ export class AppController {
         this.stopLoadingTicker();
         this.sounds.pageFound();
         this.reader.beginPage(page.number, { title: meta.title, language: meta.language });
-        if (!this.appVoiceActive) this.say(liveTitleAnnouncement(page, meta));
+        // In VoiceOver mode only the first page of a PDF is announced as it starts; each later
+        // page gets a short "Page N ready." when it is complete.
+        const laterPdfPage = page.fromPdf && page.number > pageNumber;
+        if (!this.appVoiceActive && !laterPdfPage) this.say(liveTitleAnnouncement(page, meta));
       },
       onBlock: (page, index, block) => {
         this.reader.addBlock(page.number, index, block.kind, block.text);
       },
       onPageDone: (page) => {
         this.reader.completePage(page.number);
-        this.announcePageDone(page);
+        this.announcePageDone(page, page.fromPdf === true && page.number > pageNumber);
       },
       onError: (code, message, page) => {
         this.stopLoadingTicker();
@@ -687,13 +742,11 @@ export class AppController {
           this.fail(partialPageMessage(page.number, this.canRetake(page.number), this.appVoiceActive), `Reading stopped early: ${code}`);
           return;
         }
-        this.fail(message, `Reading failed: ${code}`);
+        const spoken = isPdf && code === "too_large" ? "That PDF is too large to send. Try a smaller file." : message;
+        this.fail(spoken, `Reading failed: ${code}`);
         void this.openCamera({ addPage: adding ? pageNumber : null, intro: "none" });
       },
-    });
-    // The session counts a read as finished only after its stream closes; then the reader knows
-    // no more text is coming and can announce the end of the document.
-    void read.then(() => this.reader.setLoading(this.session.isReading));
+    };
   }
 
   /**
@@ -709,12 +762,16 @@ export class AppController {
     }
   }
 
-  private announcePageDone(page: DocPage): void {
+  private announcePageDone(page: DocPage, laterPdfPage = false): void {
     if (page.blocks.length === 0) {
-      this.say("I couldn't find any text on this page. Try again or try another page.");
+      if (!page.fromPdf) this.say("I couldn't find any text on this page. Try again or try another page.");
       return;
     }
     if (this.appVoiceActive) return; // the reader speaks the page itself
+    if (laterPdfPage) {
+      this.say(`Page ${page.number} ready.`, { priority: "low" });
+      return;
+    }
     const count = page.blocks.length;
     this.say(`Page ${page.number} ready. ${count} ${count === 1 ? "paragraph" : "paragraphs"}. Swipe right to read.`);
     this.requestFocus("transcript");
@@ -839,6 +896,10 @@ export class AppController {
   }
 
   addPage(): void {
+    if (this.session.readingPdf) {
+      this.notify("Wait a moment, I'm still reading the PDF.");
+      return;
+    }
     if (this.session.awaitingFirstLine) {
       this.notify("Wait a moment, I'm still reading the last page.");
       return;
@@ -857,15 +918,16 @@ export class AppController {
    */
   private canRetake(pageNumber: number): boolean {
     const pages = this.session.doc?.pages ?? [];
-    return pages[pages.length - 1]?.number === pageNumber && this.session.store.get().activeReads <= 1;
+    const last = pages[pages.length - 1];
+    return last?.number === pageNumber && !last.fromPdf && this.session.store.get().activeReads <= 1;
   }
 
   /** Photographs again the last page, which could only be read in part. */
   retakePage(): void {
     const doc = this.session.doc;
     const last = doc?.pages[doc.pages.length - 1];
-    if (!last?.failed) {
-      this.notify("Only a page that could not be read completely can be retaken.");
+    if (!last?.failed || last.fromPdf) {
+      this.notify("Only a photographed page that could not be read completely can be retaken.");
       return;
     }
     if (this.session.isReading) {
@@ -1209,6 +1271,11 @@ export class AppController {
     if (on) this.sounds.tick();
   }
 
+  setTheme(theme: Theme): void {
+    this.updateSettings({ theme });
+    this.sayUnlessVoiceOver(`${THEME_NAMES[theme]} colours.`);
+  }
+
   // -------------------------------------------------------------------------
   // Page visibility (screen lock, app switch)
   // -------------------------------------------------------------------------
@@ -1265,6 +1332,10 @@ function baseLang(tag: string): string {
 function sentence(text: string): string {
   const trimmed = text.trim();
   return trimmed ? trimmed.replace(/[.!?]*$/, ".") : "";
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 }
 
 /** What to say when a page stopped part way through. */

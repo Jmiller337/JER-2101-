@@ -12,6 +12,9 @@ describe("parseReadEvent", () => {
     expect(parseReadEvent({ ...meta, warning: "Cut off." })).toEqual(meta);
     expect(parseReadEvent({ type: "block", kind: "note", text: "A picture." })).toEqual({ type: "block", kind: "note", text: "A picture." });
     expect(parseReadEvent({ type: "done", blocks: 3 })).toEqual({ type: "done", blocks: 3 });
+    expect(parseReadEvent({ type: "page", number: 2 })).toEqual({ type: "page", number: 2 });
+    expect(parseReadEvent({ type: "page", number: 1 })).toBeNull();
+    expect(parseReadEvent({ type: "page" })).toBeNull();
     expect(parseReadEvent({ type: "error", code: "refusal", message: "No." })).toEqual({ type: "error", code: "refusal", message: "No." });
     expect(parseReadEvent({ type: "error", message: "No." })).toEqual({ type: "error", message: "No." });
   });

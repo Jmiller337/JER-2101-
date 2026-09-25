@@ -31,7 +31,7 @@ export function AskScreen() {
         </h1>
       </div>
       <form
-        className="flex flex-col gap-4 rounded-card border border-line bg-surface p-4 shadow-card"
+        className="flex flex-col gap-4 rounded-card border border-line bg-surface p-4"
         onSubmit={(event) => {
           event.preventDefault();
           // Clear the box only when the question was accepted, so nothing typed is lost.
@@ -60,7 +60,7 @@ export function AskScreen() {
           <button
             type="submit"
             aria-disabled={ask.busy}
-            className={`inline-flex min-h-20 items-center justify-center gap-2.5 rounded-2xl border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 text-3xl font-extrabold tracking-tight text-on-accent shadow-glow ${
+            className={`inline-flex min-h-20 items-center justify-center gap-2.5 rounded-2xl border-2 border-accent bg-accent text-3xl font-extrabold tracking-tight text-on-accent ${
               ask.busy ? "opacity-60" : "active:scale-[0.98]"
             }`}
           >
@@ -90,7 +90,7 @@ export function AskScreen() {
           </h2>
           <ol className="flex flex-col gap-4" data-testid="answers">
             {[...ask.turns].reverse().map((turn) => (
-              <li key={turn.id} className="rounded-card border border-line bg-surface-2 p-4 text-2xl shadow-card">
+              <li key={turn.id} className="rounded-card border border-line bg-surface-2 p-4 text-2xl">
                 <p className="font-semibold text-muted">Question: {turn.question}</p>
                 <p className="mt-2">
                   Answer:{" "}

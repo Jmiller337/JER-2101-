@@ -3,23 +3,31 @@ import {
   ASK_LIMITS,
   IMAGE_MEDIA_TYPES,
   MAX_IMAGE_BASE64_CHARS,
+  MAX_PDF_BASE64_CHARS,
   type AskRequest,
   type ReadRequest,
 } from "@/lib/shared/protocol";
 
-/** Request body for POST /api/read. */
-export const ReadRequestSchema = z.object({
-  image: z.object({
-    mediaType: z.enum(IMAGE_MEDIA_TYPES),
-    data: z
-      .string()
-      .min(100)
-      .max(MAX_IMAGE_BASE64_CHARS)
-      .regex(/^[A-Za-z0-9+/]+={0,2}$/, "image data must be base64 without line breaks"),
-  }),
-  pageNumber: z.number().int().min(1).max(500),
-  languageHint: z.string().min(2).max(35).nullable().optional(),
-});
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** Request body for POST /api/read: a photo or a PDF, never both. */
+export const ReadRequestSchema = z
+  .object({
+    image: z
+      .object({
+        mediaType: z.enum(IMAGE_MEDIA_TYPES),
+        data: z.string().min(100).max(MAX_IMAGE_BASE64_CHARS).regex(BASE64, "image data must be base64 without line breaks"),
+      })
+      .optional(),
+    pdf: z
+      .object({
+        data: z.string().min(100).max(MAX_PDF_BASE64_CHARS).regex(BASE64, "PDF data must be base64 without line breaks"),
+      })
+      .optional(),
+    pageNumber: z.number().int().min(1).max(500),
+    languageHint: z.string().min(2).max(35).nullable().optional(),
+  })
+  .refine((body) => (body.image ? 1 : 0) + (body.pdf ? 1 : 0) === 1, "send exactly one of image and pdf");
 
 /** Request body for POST /api/ask. */
 export const AskRequestSchema = z.object({

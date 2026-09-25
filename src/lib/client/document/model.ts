@@ -15,6 +15,8 @@ export interface DocPage {
   complete: boolean;
   /** The read stopped early (an error after some text arrived). */
   failed?: boolean;
+  /** Read from a PDF rather than photographed (it cannot be retaken with the camera). */
+  fromPdf?: boolean;
   /**
    * The photo this page was read from, kept in memory for the session so a later version can
    * re-read the page or answer questions about the image (PROMPT.md 6.4 and 6.9). Never stored.
@@ -43,10 +45,11 @@ function parseBlock(value: unknown): DocBlock | null {
 
 function parsePage(value: unknown): DocPage | null {
   if (!isObject(value)) return null;
-  const { number, language, kind, title, blocks, complete, failed } = value;
+  const { number, language, kind, title, blocks, complete, failed, fromPdf } = value;
   if (typeof number !== "number" || !Number.isInteger(number) || number < 1) return null;
   if (typeof language !== "string" || typeof kind !== "string" || typeof title !== "string") return null;
   if (typeof complete !== "boolean" || (failed !== undefined && typeof failed !== "boolean")) return null;
+  if (fromPdf !== undefined && typeof fromPdf !== "boolean") return null;
   if (!Array.isArray(blocks)) return null;
   const parsed = blocks.map(parseBlock);
   if (parsed.some((b) => b === null)) return null;
@@ -58,6 +61,7 @@ function parsePage(value: unknown): DocPage | null {
     blocks: parsed as DocBlock[],
     complete,
     ...(failed !== undefined ? { failed } : {}),
+    ...(fromPdf !== undefined ? { fromPdf } : {}),
   };
 }
 

@@ -8,6 +8,15 @@ import { readJson, removeKey, writeJson, type StorageLike } from "./storage";
  */
 export type Mode = "readAloud" | "voiceOver";
 
+/** Colour themes. Every one keeps all text at 7:1 contrast or better. */
+export type Theme = "light" | "dark" | "contrast";
+
+export const THEME_NAMES: Record<Theme, string> = {
+  light: "Light",
+  dark: "Dark",
+  contrast: "Black and yellow",
+};
+
 export interface Settings {
   mode: Mode | null;
   rate: number;
@@ -15,6 +24,7 @@ export interface Settings {
   autoCapture: boolean;
   guidance: "full" | "minimal";
   sounds: boolean;
+  theme: Theme;
 }
 
 export const RATE_MIN = 0.7;
@@ -28,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoCapture: true,
   guidance: "full",
   sounds: true,
+  theme: "light",
 };
 
 const SETTINGS_KEY = "docreader.settings.v1";
@@ -53,7 +64,8 @@ function parseStoredSettings(value: unknown): Partial<Settings> | null {
     check("voiceURI", v.voiceURI === null || typeof v.voiceURI === "string") &&
     check("autoCapture", typeof v.autoCapture === "boolean") &&
     check("guidance", v.guidance === "full" || v.guidance === "minimal") &&
-    check("sounds", typeof v.sounds === "boolean");
+    check("sounds", typeof v.sounds === "boolean") &&
+    check("theme", v.theme === "light" || v.theme === "dark" || v.theme === "contrast");
   return valid ? out : null;
 }
 

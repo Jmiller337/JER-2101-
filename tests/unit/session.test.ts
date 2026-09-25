@@ -44,6 +44,36 @@ function callbacks(): PageReadCallbacks & { calls: string[] } {
 const META: ReadEvent = { type: "meta", status: "ok", language: "en", kind: "letter", title: "A letter" };
 const BLOCK: ReadEvent = { type: "block", kind: "paragraph", text: "Hello." };
 
+describe("DocumentSession with a PDF", () => {
+  it("turns page lines into pages, marks them as from a PDF, and blocks adding pages meanwhile", async () => {
+    const storage = new MemoryStorage();
+    const events: ReadEvent[] = [
+      META,
+      BLOCK,
+      { type: "page", number: 2 },
+      { type: "block", kind: "paragraph", text: "Second page." },
+      { type: "done", blocks: 2 },
+    ];
+    const client = api(events);
+    const session = new DocumentSession({ api: client, passcode: () => "p", storage });
+    const cb = callbacks();
+    const seenReading: boolean[] = [];
+    const unsubscribe = session.store.subscribe(() => seenReading.push(session.readingPdf));
+    expect(await session.readPdf({ base64: "JVBERi0xLjQ=", bytes: 8 }, cb)).toBe("ok");
+    unsubscribe();
+    expect(cb.calls).toEqual(["start:1", "block:1:0", "done:1", "start:2", "block:2:0", "done:2"]);
+    expect(client.requests[0]).toEqual({ pdf: { data: "JVBERi0xLjQ=" }, pageNumber: 1, languageHint: null });
+    expect(session.doc?.pages.map((p) => [p.number, p.fromPdf, p.complete])).toEqual([
+      [1, true, true],
+      [2, true, true],
+    ]);
+    expect(seenReading).toContain(true);
+    expect(session.readingPdf).toBe(false);
+    // The PDF flag survives a reload.
+    expect(loadDoc(storage)?.pages.every((p) => p.fromPdf)).toBe(true);
+  });
+});
+
 describe("DocumentSession", () => {
   it("builds a page from the stream and saves the document", async () => {
     const storage = new MemoryStorage();

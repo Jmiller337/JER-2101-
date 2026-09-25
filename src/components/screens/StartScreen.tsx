@@ -26,7 +26,7 @@ export function StartButtonMarkup({
         type="button"
         data-start="1"
         onClick={onStart}
-        className="m-4 mt-6 flex flex-1 flex-col items-center justify-center gap-5 rounded-[2rem] border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 px-6 text-center text-5xl font-extrabold leading-tight tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
+        className="m-4 mt-6 flex flex-1 flex-col items-center justify-center gap-5 rounded-card border-2 border-accent bg-accent px-6 text-center text-5xl font-extrabold leading-tight tracking-tight text-on-accent active:scale-[0.99]"
       >
         <PlayIcon className="h-16 w-16" />
         Start. Tap anywhere.

@@ -2,10 +2,14 @@
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
 export const LIMITS = {
-  /** Largest request body accepted by any route (the phone sends well under 1.5 MB). */
+  /** Largest request body for questions (the phone sends well under 1.5 MB). */
   maxBodyBytes: 6 * 1024 * 1024,
+  /** Largest body for a read: a PDF of up to 15 MB, as base64, plus a little JSON. */
+  maxReadBodyBytes: 21 * 1024 * 1024,
   /** Upper bound on generated tokens for one page read or one answer. */
   maxTokens: 16000,
+  /** A PDF can have many pages, all transcribed in one streamed answer. */
+  maxPdfTokens: 64000,
   /** Request timeout for one model call. */
   modelTimeoutMs: 120_000,
   /** Question history sent to the model: the last ten turns. */

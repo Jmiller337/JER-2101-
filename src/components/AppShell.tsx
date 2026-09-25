@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useController, useStore } from "./hooks";
 import { LiveRegions } from "./LiveRegions";
 import { AskScreen } from "./screens/AskScreen";
@@ -13,6 +14,8 @@ import { StartScreen } from "./screens/StartScreen";
 export function AppShell() {
   const controller = useController();
   const { screen, speechUnavailable } = useStore(controller.ui);
+  const { theme } = useStore(controller.settings);
+  useEffect(() => applyTheme(theme), [theme]);
   return (
     <>
       <LiveRegions />
@@ -30,4 +33,12 @@ export function AppShell() {
       {screen === "settings" && <SettingsScreen />}
     </>
   );
+}
+
+/** Page background of each theme, for the browser's toolbar tint. Matches globals.css. */
+const THEME_BACKGROUNDS: Record<string, string> = { light: "#f4f4f0", dark: "#000000", contrast: "#000000" };
+
+function applyTheme(theme: string): void {
+  document.documentElement.setAttribute("data-theme", theme);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BACKGROUNDS[theme] ?? "#f4f4f0");
 }

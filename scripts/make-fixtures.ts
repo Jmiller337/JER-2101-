@@ -71,6 +71,32 @@ const ICON_HTML = (size: number) => `<!doctype html><html><body style="margin:0;
   <path d="M78 65 q10 11 0 22" stroke="#fde047" stroke-width="3.5" fill="none" stroke-linecap="round"/>
 </svg></body></html>`;
 
+const LETTER_PDF_HTML = `<!doctype html><html><head><style>
+  body { font: 16px/1.5 Georgia, serif; margin: 0; }
+  section { padding: 72px; break-after: page; }
+  h1 { font-size: 24px; }
+</style></head><body>
+  <section>
+    <h1>Riverside Library</h1>
+    <p>September 20, 2026</p>
+    <p>Dear Ms. Alvarez,</p>
+    <p>Thank you for returning The Long Road. The book was returned on September 3, 2026, eight days late.</p>
+  </section>
+  <section>
+    <p>Late fee: $2.40.</p>
+    <p>You can pay at the front desk or by phone at 555-0199.</p>
+    <p>Sincerely, the Riverside Library circulation desk</p>
+  </section>
+</body></html>`;
+
+export async function writeLetterPdf(browser: Awaited<ReturnType<typeof chromium.launch>>, file: string): Promise<void> {
+  const page = await browser.newPage();
+  await page.setContent(LETTER_PDF_HTML);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, await page.pdf({ format: "Letter" }));
+  await page.close();
+}
+
 async function main(): Promise<void> {
   const browser = await chromium.launch({ executablePath: existsSync(systemChromium) ? systemChromium : undefined });
   try {
@@ -128,6 +154,10 @@ async function main(): Promise<void> {
     mkdirSync(pagesDir, { recursive: true });
     writeFileSync(path.join(pagesDir, "letter-photo.jpg"), Buffer.from(jpeg, "base64"));
     console.log("wrote tests/fixtures/pages/letter-photo.jpg");
+
+    // A two-page letter as a real text PDF, for the "Open a PDF" tests and a real-API check.
+    await writeLetterPdf(browser, path.join(pagesDir, "letter.pdf"));
+    console.log("wrote tests/fixtures/pages/letter.pdf");
 
     // Icons.
     const icons: Array<[string, number]> = [

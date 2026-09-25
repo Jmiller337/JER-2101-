@@ -104,12 +104,49 @@ describe("POST /api/read", () => {
     expect((await handleRead(postJson("/api/read", GOOD_BODY), deps)).status).toBe(500);
   });
 
-  it("rejects bodies over 6 MB with 413", async () => {
+  it("rejects bodies over 21 MB with 413", async () => {
     const deps = makeDeps({ chunks: [] });
-    const big = { ...GOOD_BODY, image: { mediaType: "image/jpeg", data: "A".repeat(6 * 1024 * 1024 + 10) } };
+    const big = { ...GOOD_BODY, pdf: { data: "A".repeat(21 * 1024 * 1024 + 10) }, image: undefined };
     const res = await handleRead(postJson("/api/read", big), deps);
     expect(res.status).toBe(413);
     expect(await res.json()).toMatchObject({ error: "too_large" });
+  });
+
+  it("sends a PDF to the model as a document and numbers its pages", async () => {
+    const deps = makeDeps({
+      chunks: chunkText(ndjson(META, BLOCK, { type: "page" }, { type: "block", kind: "paragraph", text: "Page two." }, { type: "done", blocks: 2 }), 11),
+    });
+    const res = await handleRead(postJson("/api/read", { pdf: { data: IMAGE_DATA }, pageNumber: 4, languageHint: null }), deps);
+    expect(await readNdjson(res)).toEqual([
+      META,
+      BLOCK,
+      { type: "page", number: 5 },
+      { type: "block", kind: "paragraph", text: "Page two." },
+      { type: "done", blocks: 2 },
+    ]);
+    const params = deps.calls[0]!;
+    expect(params.max_tokens).toBe(64000);
+    expect(params.output_config).toEqual({ effort: "high" });
+    expect(String(params.system)).toContain("You receive a PDF");
+    const content = params.messages[0]!.content as Array<{ type: string; source?: unknown }>;
+    expect(content.map((c) => c.type)).toEqual(["document", "text"]);
+    expect(content[0]!.source).toEqual({ type: "base64", media_type: "application/pdf", data: IMAGE_DATA });
+    expect(deps.logs[0]).toMatchObject({ outcome: "ok", pages: 2, pdfChars: IMAGE_DATA.length });
+  });
+
+  it("requires exactly one of a photo and a PDF", async () => {
+    const deps = makeDeps({ chunks: [] });
+    const both = { ...GOOD_BODY, pdf: { data: IMAGE_DATA } };
+    expect((await handleRead(postJson("/api/read", both), deps)).status).toBe(400);
+    const neither = { pageNumber: 1, languageHint: null };
+    expect((await handleRead(postJson("/api/read", neither), deps)).status).toBe(400);
+    expect(deps.calls).toHaveLength(0);
+  });
+
+  it("ignores page lines when reading a photo", async () => {
+    const deps = makeDeps({ chunks: [ndjson(META, BLOCK, { type: "page" }, BLOCK)] });
+    const events = await readNdjson(await handleRead(postJson("/api/read", GOOD_BODY), deps));
+    expect(events.map((e) => e.type)).toEqual(["meta", "block", "block", "done"]);
   });
 
   it("rejects malformed JSON and invalid images with 400", async () => {

@@ -160,6 +160,29 @@ describe("ModelOutputParser", () => {
   });
 });
 
+describe("ModelOutputParser with a PDF", () => {
+  function runPdf(text: string, firstPage = 1): { events: ReadEvent[]; parser: ModelOutputParser } {
+    const parser = new ModelOutputParser({ firstPage, multiPage: true });
+    const events: ReadEvent[] = [];
+    for (let i = 0; i < text.length; i += 9) events.push(...parser.push(text.slice(i, i + 9)));
+    events.push(...parser.finish());
+    for (const event of events) expect(parseReadEvent(event)).toEqual(event);
+    return { events, parser };
+  }
+
+  it("numbers pages from the first page number and never makes an empty page", () => {
+    const { events, parser } = runPdf(ndjson(META, { type: "page" }, B1, { type: "page" }, { type: "page" }, B2), 3);
+    expect(events.map((e) => e.type)).toEqual(["meta", "block", "page", "block", "done"]);
+    expect(events[2]).toEqual({ type: "page", number: 4 });
+    expect(parser.stats.pages).toBe(2);
+  });
+
+  it("drops a warning the model writes anyway", () => {
+    const { events } = runPdf(ndjson({ ...META, warning: "The scan is faint." }, B1));
+    expect(events[0]).not.toHaveProperty("warning");
+  });
+});
+
 describe("parseJsonObjects", () => {
   it("returns nothing for non-JSON lines", () => {
     expect(parseJsonObjects("hello")).toEqual([]);

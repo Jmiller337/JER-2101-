@@ -33,7 +33,7 @@ export function ReaderControls({ extra }: { extra?: React.ReactNode }) {
   return (
     <nav
       aria-label="Reading controls"
-      className="sticky bottom-0 border-t border-line bg-surface/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-card backdrop-blur-md"
+      className="sticky bottom-0 border-t border-line bg-surface/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
     >
       <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-2">
         <Button

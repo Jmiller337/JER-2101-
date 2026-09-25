@@ -23,7 +23,7 @@ export function ModeScreen() {
       <button
         type="button"
         onClick={() => controller.chooseMode("voiceOver")}
-        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-line-2 bg-surface-2 p-6 text-center text-4xl font-extrabold tracking-tight text-text shadow-card active:scale-[0.99]"
+        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-line-2 bg-surface-2 p-6 text-center text-4xl font-extrabold tracking-tight text-text active:scale-[0.99]"
       >
         <EarIcon className="h-14 w-14 text-accent" />
         I use VoiceOver
@@ -32,7 +32,7 @@ export function ModeScreen() {
       <button
         type="button"
         onClick={() => controller.chooseMode("readAloud")}
-        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-accent-2 bg-linear-to-b from-accent to-accent-2 p-6 text-center text-4xl font-extrabold tracking-tight text-on-accent shadow-glow active:scale-[0.99]"
+        className="flex flex-1 flex-col items-center justify-center gap-3 rounded-card border-2 border-accent bg-accent p-6 text-center text-4xl font-extrabold tracking-tight text-on-accent active:scale-[0.99]"
       >
         <SpeakerIcon className="h-14 w-14" />
         Read aloud to me

@@ -62,6 +62,17 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Reload the page in Safari (or close and reopen the tab): after Start, the app says "Your document is still here…" and Play reads it.
 - [ ] New document asks for a second press ("Press New document again to clear this document…") and only then clears it.
 
+## 3a2. PDFs
+
+Before starting, save a PDF to the iPhone's Files app (for example a bill emailed as a PDF: open the attachment, tap Share, then Save to Files).
+
+- [ ] On the camera screen, press "Open a PDF". The file picker opens; choose the PDF.
+- [ ] The app says "Got it. Reading the PDF.", then what the document is, then reads it.
+- [ ] Between pages it says "Page 2.", and it reads to the end of the last page.
+- [ ] Ask a question about something on the second page: the answer is right.
+- [ ] Press Add page while the PDF is still being read: the app says "Wait a moment, I'm still reading the PDF."
+- [ ] Choose a file that is not a PDF (a photo, for example): the app says it is not a PDF.
+
 ## 3b. Questions
 
 - [ ] Ask a question: the app says "Ask your question, then press Send. Or press Talk and say it."
@@ -82,6 +93,12 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] If the Voice section shows "A nicer voice is available", download a voice as it says (Ava or Zoe, Enhanced or Premium). Afterwards the card is gone and Preview sounds noticeably better.
 - [ ] "Back to reading" says "Resuming." and continues.
 - [ ] Settings survive closing and reopening Safari.
+
+## 4a. Colours and focus
+
+- [ ] Settings, Colours: Light, Dark, and Black and yellow each change the whole app at once and are remembered after closing Safari.
+- [ ] No coloured rectangle appears around the headings or the Start button.
+- [ ] On the camera screen the four white corner marks form an upright, page-shaped box.
 
 ## 5. Sound and the screen
 
