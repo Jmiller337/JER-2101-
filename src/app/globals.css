@@ -33,6 +33,10 @@
   /* Always dark, whatever the theme: glass over the live camera picture. */
   --color-scrim: #141416;
   --color-on-scrim: #ffffff;
+  /* The camera's mode strip, always over the dark camera panel: yellow for the mode showing,
+     as on the iPhone's Camera, and light grey for the others (both far above 7:1). */
+  --color-mode-selected: #ffd60a;
+  --color-mode-idle: #d1d1d6;
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
@@ -169,6 +173,35 @@ body {
   .glass-dark {
     background-color: var(--color-scrim);
   }
+}
+
+/*
+ * The box around the page on the camera screen, over the live picture in every theme: white
+ * while the page is being lined up, green when the picture is taken. A dark halo keeps the line
+ * visible on white paper as well as on a dark table.
+ */
+.page-outline .page-outline-halo {
+  fill: none;
+  stroke: rgb(0 0 0 / 0.55);
+  stroke-width: 11px;
+  stroke-linejoin: round;
+}
+.page-outline .page-outline-line {
+  fill: rgb(255 255 255 / 0.08);
+  stroke: #ffffff;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  transition:
+    stroke 150ms ease,
+    fill 150ms ease;
+}
+.page-outline[data-state="ready"] .page-outline-line {
+  fill: rgb(48 209 88 / 0.25);
+  stroke: #30d158;
+  stroke-width: 7px;
+}
+.page-outline[data-state="hidden"] {
+  visibility: hidden;
 }
 
 /*

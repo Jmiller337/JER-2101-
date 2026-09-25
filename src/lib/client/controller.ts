@@ -32,6 +32,8 @@ import { pickVoice, voicesForLanguage } from "./speech/voices";
 import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
 import { FRAMING, CuePolicy, FramingTracker, type Situation } from "./vision/framing";
+import { CAMERA_MODE_LINES, MODES_HINT, modeAfterSwipe, type CameraMode, type SwipeDirection } from "./cameraModes";
+import { NO_OUTLINE, normalizeQuad, type PageOutline } from "./vision/outline";
 import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
@@ -54,6 +56,8 @@ export interface UiState {
   addingPage: number | null;
   /** Heading of the camera screen: "Camera", "Add page 2", or "Retake page 2". */
   cameraTitle: string;
+  /** Which of the camera screen's modes is showing: the live camera, a PDF, or a photo. */
+  cameraMode: CameraMode;
   /** Screens move focus when this changes. */
   focus: { target: FocusTarget; seq: number };
   /** The browser has no speech engine: everything goes to the live region and a banner shows. */
@@ -85,6 +89,8 @@ export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
 export const CAMERA_PERMISSION_LINE = "I need the camera to see the page. Tap Allow if your phone asks.";
 export const CAMERA_INTRO = "Camera ready.";
+/** How long the box around the page stays after the page is lost. */
+const OUTLINE_HOLD_MS = 400;
 
 export interface ControllerEnv {
   port: SpeechPort;
@@ -127,6 +133,8 @@ export class AppController {
   /** Voices the phone offers (they load asynchronously on iOS). */
   readonly voices: Store<VoiceInfo[]>;
   readonly ask: Store<AskState>;
+  /** The box drawn around the page on the camera screen. */
+  readonly outline = new Store<PageOutline>(NO_OUTLINE);
 
   private readonly env: ControllerEnv;
   private passcode: string | null;
@@ -143,6 +151,8 @@ export class AppController {
   private tracker = new FramingTracker();
   private readonly cuePolicy = new CuePolicy();
   private analysisTimer: unknown = null;
+  /** When the page was last seen, so the box survives a frame or two without it. */
+  private outlineSeenAt = -Infinity;
   /** Automatic capture fires at most once per visit to the camera screen (PROMPT.md 6.3). */
   private armed = false;
   private torchTried = false;
@@ -178,6 +188,7 @@ export class AppController {
       docAppVoice: false,
       addingPage: null,
       cameraTitle: "Camera",
+      cameraMode: "camera",
       focus: { target: "heading", seq: 0 },
       speechUnavailable: false,
     });
@@ -378,7 +389,7 @@ export class AppController {
   }): Promise<void> {
     const page = opts.retake ?? opts.addPage ?? null;
     const cameraTitle = opts.retake ? `Retake page ${opts.retake}` : opts.addPage ? `Add page ${opts.addPage}` : "Camera";
-    this.ui.update({ addingPage: page, cameraTitle, cameraError: null });
+    this.ui.update({ addingPage: page, cameraTitle, cameraError: null, cameraMode: "camera" });
     this.cameraIntroPending = opts.intro ?? (opts.retake ? "retake" : opts.addPage ? "addPage" : "full");
     if (opts.first && !(await cameraPermissionGranted())) this.say(CAMERA_PERMISSION_LINE);
     this.navigate("camera");
@@ -437,6 +448,7 @@ export class AppController {
     this.videoToken += 1;
     this.videoEl = null;
     this.stopGuidance();
+    this.outline.set(NO_OUTLINE);
     this.resolveCameraWaiters(null);
     if (this.camera) {
       void this.camera.setTorch(false);
@@ -452,9 +464,11 @@ export class AppController {
 
   private startGuidance(): void {
     this.stopGuidance();
+    if (this.ui.get().cameraMode !== "camera") return;
     this.tracker = new FramingTracker();
     this.tracker.calmMs = this.calmMsForRetries();
     this.cuePolicy.reset();
+    this.outline.set(NO_OUTLINE);
     this.armed = true;
     this.torchTried = false;
     this.scheduleAnalysis(250);
@@ -498,6 +512,7 @@ export class AppController {
     if (frame) {
       const now = this.now();
       const situation = this.tracker.update(frame, now);
+      this.showOutline(situation, now);
       if (situation.kind === "ready" && this.armed && this.settings.get().autoCapture) {
         void this.autoCapture();
         return;
@@ -505,6 +520,21 @@ export class AppController {
       this.guide(situation, now);
     }
     this.scheduleAnalysis();
+  }
+
+  /**
+   * The box around the page: white while the page is being lined up, green when it is ready and
+   * the picture is taken. A page lost for a frame or two keeps its box, so it does not flicker.
+   */
+  private showOutline(situation: Situation, now: number): void {
+    const analysis = this.tracker.lastAnalysis;
+    const quad = analysis?.page.quad;
+    if (analysis && quad) {
+      this.outlineSeenAt = now;
+      this.outline.set({ quad: normalizeQuad(quad, analysis.luma.width, analysis.luma.height), ready: situation.kind === "ready" });
+    } else if (now - this.outlineSeenAt > OUTLINE_HOLD_MS && this.outline.get().quad) {
+      this.outline.set(NO_OUTLINE);
+    }
   }
 
   private guide(situation: Situation, now: number): void {
@@ -545,6 +575,7 @@ export class AppController {
 
   private retryAutoCapture(message: string): void {
     this.ui.update({ capturing: false });
+    this.outline.update({ ready: false });
     this.tracker.resetSteady();
     this.armed = true;
     this.say(message);
@@ -554,10 +585,43 @@ export class AppController {
   private speakCameraIntro(): void {
     const intro = this.cameraIntroPending;
     this.cameraIntroPending = "none";
+    // A swipe to another mode while the camera was starting has already said where the user is.
+    if (this.ui.get().cameraMode !== "camera") return;
     const page = this.ui.get().addingPage ?? this.session.nextPageNumber;
-    if (intro === "full") this.say(CAMERA_INTRO);
+    // Until the user has changed mode once, the app voice mentions the swipe. (VoiceOver users
+    // cannot swipe here: VoiceOver takes the gesture. They find the modes as tabs.)
+    const hint = this.channel() === "speech" && !this.settings.get().modesLearned;
+    if (intro === "full") this.say(hint ? `${CAMERA_INTRO} ${MODES_HINT}` : CAMERA_INTRO);
     else if (intro === "addPage") this.say(`Add page ${page}.`);
     else if (intro === "retake") this.say(`Retake page ${page}.`);
+  }
+
+  /**
+   * Moves the camera screen to another mode (PDF, Camera, Photos) and says which. Framing
+   * guidance and automatic capture run only in Camera mode.
+   */
+  setCameraMode(mode: CameraMode): void {
+    const ui = this.ui.get();
+    if (ui.screen !== "camera" || ui.capturing) return;
+    if (!this.settings.get().modesLearned) this.updateSettings({ modesLearned: true });
+    if (mode !== ui.cameraMode) {
+      this.ui.update({ cameraMode: mode, errorText: null });
+      if (mode === "camera") {
+        if (this.camera) this.startGuidance();
+      } else {
+        this.stopGuidance();
+        this.outline.set(NO_OUTLINE);
+        if (this.camera) void this.camera.setTorch(false);
+      }
+    }
+    // VoiceOver reads the selected tab itself.
+    this.sayUnlessVoiceOver(CAMERA_MODE_LINES[mode]);
+  }
+
+  /** A sideways swipe on the camera screen. At either end it says the current mode again. */
+  swipeCameraMode(direction: SwipeDirection): void {
+    const current = this.ui.get().cameraMode;
+    this.setCameraMode(modeAfterSwipe(current, direction) ?? current);
   }
 
   /** Without a full-sensor photo, the sharpest of four video frames taken 90 ms apart. */

@@ -11,6 +11,8 @@ export interface SeedSettings {
   guidance?: "full" | "minimal";
   sounds?: boolean;
   theme?: "light" | "dark" | "contrast";
+  /** False to hear the first-run swipe hint on the camera screen. */
+  modesLearned?: boolean;
 }
 
 /**
@@ -71,7 +73,7 @@ export async function openApp(page: Page, opts: { settings?: SeedSettings; passc
   await page.addInitScript(recordAnnouncements);
   if (opts.settings || opts.passcode) {
     const settings = opts.settings
-      ? { mode: null, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true, ...opts.settings }
+      ? { mode: null, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true, modesLearned: true, ...opts.settings }
       : null;
     await page.addInitScript(
       ([seed, passcode]) => {
@@ -158,4 +160,57 @@ export async function openMore(scope: Page | Locator) {
   const button = scope.getByRole("button", { name: "More" });
   if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
   await expect(button).toHaveAttribute("aria-expanded", "true");
+}
+
+/** Records every state the box around the page goes through. */
+export async function recordOutline(page: Page) {
+  await page.addInitScript(() => {
+    const states: string[] = [];
+    (window as unknown as { __outlineStates: string[] }).__outlineStates = states;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const el = record.target as Element;
+        if (el.getAttribute("data-testid") !== "page-outline") continue;
+        const state = el.getAttribute("data-state") ?? "";
+        if (states.at(-1) !== state) states.push(state);
+      }
+    }).observe(document, { attributes: true, attributeFilter: ["data-state"], subtree: true });
+  });
+}
+
+export function outlineStates(page: Page): Promise<string[]> {
+  return page.evaluate(() => (window as unknown as { __outlineStates: string[] }).__outlineStates);
+}
+
+/** The box's corners on screen, and where the picture is shown. */
+export function outlineGeometry(page: Page) {
+  return page.evaluate(() => {
+    const video = document.querySelector("video")!;
+    const box = video.getBoundingClientRect();
+    const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight);
+    const width = video.videoWidth * scale;
+    const height = video.videoHeight * scale;
+    const svg = document.querySelector('[data-testid="page-outline"]')!.getBoundingClientRect();
+    const points = (document.querySelector(".page-outline-line")!.getAttribute("points") ?? "")
+      .split(" ")
+      .filter(Boolean)
+      .map((pair) => pair.split(",").map(Number) as [number, number])
+      .map(([x, y]) => ({ x: x + svg.left, y: y + svg.top }));
+    return { picture: { x: box.left + (box.width - width) / 2, y: box.top + (box.height - height) / 2, width, height }, points };
+  });
+}
+
+/**
+ * A quick sideways swipe across the camera screen with a mouse (the app treats every pointer
+ * alike). "left" moves the finger from right to left, bringing in the mode on the right.
+ */
+export async function swipe(page: Page, direction: "left" | "right", from?: { x: number; y: number }) {
+  const viewport = page.viewportSize()!;
+  const start = from ?? { x: viewport.width / 2, y: viewport.height * 0.4 };
+  const dx = direction === "left" ? -160 : 160;
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + dx / 2, start.y + 4, { steps: 3 });
+  await page.mouse.move(start.x + dx, start.y + 6, { steps: 3 });
+  await page.mouse.up();
 }

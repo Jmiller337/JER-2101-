@@ -26,6 +26,8 @@ export interface Settings {
   guidance: "full" | "minimal";
   sounds: boolean;
   theme: Theme;
+  /** The user has moved between the camera screen's modes once, so the swipe hint stops. */
+  modesLearned: boolean;
 }
 
 export const RATE_MIN = 0.7;
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   guidance: "full",
   sounds: true,
   theme: "auto",
+  modesLearned: false,
 };
 
 const SETTINGS_KEY = "docreader.settings.v1";
@@ -66,7 +69,8 @@ function parseStoredSettings(value: unknown): Partial<Settings> | null {
     check("autoCapture", typeof v.autoCapture === "boolean") &&
     check("guidance", v.guidance === "full" || v.guidance === "minimal") &&
     check("sounds", typeof v.sounds === "boolean") &&
-    check("theme", v.theme === "auto" || v.theme === "light" || v.theme === "dark" || v.theme === "contrast");
+    check("theme", v.theme === "auto" || v.theme === "light" || v.theme === "dark" || v.theme === "contrast") &&
+    check("modesLearned", typeof v.modesLearned === "boolean");
   return valid ? out : null;
 }
 

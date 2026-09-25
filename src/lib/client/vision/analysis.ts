@@ -25,6 +25,15 @@ export interface Box {
   y1: number;
 }
 
+/** A point in frame pixels (0 to width, 0 to height). */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** The page's outline: four corners in clockwise order on screen, in frame pixels. */
+export type Quad = [Point, Point, Point, Point];
+
 export interface Edges {
   left: boolean;
   right: boolean;
@@ -35,6 +44,8 @@ export interface Edges {
 export interface PageEstimate {
   found: boolean;
   box: Box | null;
+  /** The page's corners, which follow a tilted or skewed page; the box is its upright bounds. */
+  quad: Quad | null;
   /** Page box area as a fraction of the frame. */
   coverage: number;
   touches: Edges;
@@ -119,6 +130,42 @@ export function otsu(values: Uint8Array): { threshold: number; lowMean: number; 
   };
 }
 
+/**
+ * Fills the holes in a binary mask: every unset region that does not reach the frame's border
+ * becomes set. The lines of text on a page leave dark holes in its bright region, which would
+ * otherwise split a tilted page into pieces.
+ */
+export function fillHoles(mask: Uint8Array, width: number, height: number): Uint8Array {
+  const out = Uint8Array.from(mask);
+  const outside = new Uint8Array(mask.length);
+  const stack = new Int32Array(mask.length);
+  let top = 0;
+  const push = (i: number) => {
+    if (!mask[i] && !outside[i]) {
+      outside[i] = 1;
+      stack[top++] = i;
+    }
+  };
+  for (let x = 0; x < width; x++) {
+    push(x);
+    push((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y++) {
+    push(y * width);
+    push(y * width + width - 1);
+  }
+  while (top > 0) {
+    const i = stack[--top]!;
+    const x = i % width;
+    if (x > 0) push(i - 1);
+    if (x < width - 1) push(i + 1);
+    if (i >= width) push(i - width);
+    if (i < mask.length - width) push(i + width);
+  }
+  for (let i = 0; i < out.length; i++) if (!outside[i]) out[i] = 1;
+  return out;
+}
+
 /** 3 by 3 erosion of a binary mask (1 = set). Removes specks and thin bright lines. */
 export function erode(mask: Uint8Array, width: number, height: number): Uint8Array {
   const out = new Uint8Array(mask.length);
@@ -155,9 +202,58 @@ export function erode(mask: Uint8Array, width: number, height: number): Uint8Arr
 export interface Component {
   area: number;
   box: Box;
+  quad: Quad;
 }
 
-/** The largest 4-connected component of a binary mask. */
+export function quadArea(quad: Quad): number {
+  let twice = 0;
+  for (let k = 0; k < 4; k++) {
+    const a = quad[k]!;
+    const b = quad[(k + 1) % 4]!;
+    twice += a.x * b.y - b.x * a.y;
+  }
+  return Math.abs(twice) / 2;
+}
+
+/**
+ * The corners of a roughly four-sided blob from its extreme pixels. Extremes along the
+ * diagonals (x + y and x - y) are the corners of a page that is upright or tilted by less than
+ * 45 degrees; extremes along the axes are the corners of a page turned further. The larger of
+ * the two outlines is the right one. The eroded mask lost one pixel all round, so the corners
+ * move out by one pixel, and each corner sits on the outer edge of its pixel.
+ */
+function cornersOf(width: number, height: number, at: Int32Array): Quad {
+  const px = (i: number) => i % width;
+  const py = (i: number) => Math.floor(i / width);
+  const clamp = (p: Point): Point => ({ x: Math.min(width, Math.max(0, p.x)), y: Math.min(height, Math.max(0, p.y)) });
+  // The pixel indices of the extremes, in the order largestComponent records them.
+  const [minX, maxX, minY, maxY, minSum, maxSum, minDiff, maxDiff] = at;
+  const diagonal: Quad = [
+    clamp({ x: px(minSum!) - 1, y: py(minSum!) - 1 }),
+    clamp({ x: px(maxDiff!) + 2, y: py(maxDiff!) - 1 }),
+    clamp({ x: px(maxSum!) + 2, y: py(maxSum!) + 2 }),
+    clamp({ x: px(minDiff!) - 1, y: py(minDiff!) + 2 }),
+  ];
+  const axis: Quad = [
+    clamp({ x: px(minY!) + 0.5, y: py(minY!) - 1 }),
+    clamp({ x: px(maxX!) + 2, y: py(maxX!) + 0.5 }),
+    clamp({ x: px(maxY!) + 0.5, y: py(maxY!) + 2 }),
+    clamp({ x: px(minX!) - 1, y: py(minX!) + 0.5 }),
+  ];
+  return quadArea(axis) > quadArea(diagonal) * 1.05 ? axis : diagonal;
+}
+
+/** The corners of an upright box, in frame pixels. */
+export function boxQuad(box: Box): Quad {
+  return [
+    { x: box.x0, y: box.y0 },
+    { x: box.x1 + 1, y: box.y0 },
+    { x: box.x1 + 1, y: box.y1 + 1 },
+    { x: box.x0, y: box.y1 + 1 },
+  ];
+}
+
+/** The largest 4-connected component of a binary mask, with its bounding box and corners. */
 export function largestComponent(mask: Uint8Array, width: number, height: number): Component | null {
   const labels = new Int32Array(mask.length);
   const stack = new Int32Array(mask.length);
@@ -174,15 +270,48 @@ export function largestComponent(mask: Uint8Array, width: number, height: number
     let y0 = height;
     let x1 = -1;
     let y1 = -1;
+    let minSum = Infinity;
+    let maxSum = -Infinity;
+    let minDiff = Infinity;
+    let maxDiff = -Infinity;
+    const at = new Int32Array(8);
     while (top > 0) {
       const i = stack[--top]!;
       area += 1;
       const x = i % width;
       const y = (i - x) / width;
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
+      if (x < x0) {
+        x0 = x;
+        at[0] = i;
+      }
+      if (x > x1) {
+        x1 = x;
+        at[1] = i;
+      }
+      if (y < y0) {
+        y0 = y;
+        at[2] = i;
+      }
+      if (y > y1) {
+        y1 = y;
+        at[3] = i;
+      }
+      if (x + y < minSum) {
+        minSum = x + y;
+        at[4] = i;
+      }
+      if (x + y > maxSum) {
+        maxSum = x + y;
+        at[5] = i;
+      }
+      if (x - y < minDiff) {
+        minDiff = x - y;
+        at[6] = i;
+      }
+      if (x - y > maxDiff) {
+        maxDiff = x - y;
+        at[7] = i;
+      }
       if (x > 0 && mask[i - 1] && !labels[i - 1]) {
         labels[i - 1] = label;
         stack[top++] = i - 1;
@@ -200,7 +329,7 @@ export function largestComponent(mask: Uint8Array, width: number, height: number
         stack[top++] = i + width;
       }
     }
-    if (!best || area > best.area) best = { area, box: { x0, y0, x1, y1 } };
+    if (!best || area > best.area) best = { area, box: { x0, y0, x1, y1 }, quad: cornersOf(width, height, at) };
   }
   return best;
 }
@@ -302,7 +431,7 @@ function expand(box: Box, width: number, height: number, fraction: number): Box 
 export function findPage(luma: Luma): PageEstimate {
   const { data, width, height } = luma;
   const frameArea = width * height;
-  const none: PageEstimate = { found: false, box: null, coverage: 0, touches: NO_EDGES, strategy: "none" };
+  const none: PageEstimate = { found: false, box: null, quad: null, coverage: 0, touches: NO_EDGES, strategy: "none" };
   const detail = () => detailBox(luma);
 
   const { threshold, lowMean, highMean } = otsu(data);
@@ -310,7 +439,7 @@ export function findPage(luma: Luma): PageEstimate {
   if (highMean - lowMean >= 40 && highMean >= 90) {
     const mask = new Uint8Array(data.length);
     for (let i = 0; i < data.length; i++) mask[i] = data[i]! > threshold ? 1 : 0;
-    const component = largestComponent(erode(mask, width, height), width, height);
+    const component = largestComponent(erode(fillHoles(mask, width, height), width, height), width, height);
     if (component) {
       const fill = component.area / boxArea(component.box);
       if (component.area >= frameArea * 0.04 && fill >= 0.45) bright = component;
@@ -328,11 +457,18 @@ export function findPage(luma: Luma): PageEstimate {
         const textTouches = touchingEdges(text, width, height);
         if (countEdges(textTouches) <= 1) {
           const box = expand(text, width, height, 0.05);
-          return { found: true, box, coverage: boxArea(box) / frameArea, touches: touchingEdges(box, width, height), strategy: "edges" };
+          return {
+            found: true,
+            box,
+            quad: boxQuad(box),
+            coverage: boxArea(box) / frameArea,
+            touches: touchingEdges(box, width, height),
+            strategy: "edges",
+          };
         }
       }
     }
-    return { found: true, box: bright.box, coverage, touches, strategy: "bright" };
+    return { found: true, box: bright.box, quad: bright.quad, coverage, touches, strategy: "bright" };
   }
 
   const text = detail().box;
@@ -340,7 +476,7 @@ export function findPage(luma: Luma): PageEstimate {
   const box = expand(text, width, height, 0.05);
   const coverage = boxArea(box) / frameArea;
   if (coverage < 0.02) return none;
-  return { found: true, box, coverage, touches: touchingEdges(box, width, height), strategy: "edges" };
+  return { found: true, box, quad: boxQuad(box), coverage, touches: touchingEdges(box, width, height), strategy: "edges" };
 }
 
 /** How far two boxes differ: the largest change of any edge, in pixels. */

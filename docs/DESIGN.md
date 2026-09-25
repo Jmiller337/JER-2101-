@@ -9,12 +9,13 @@ This spec follows the owner's design brief (Apple Human Interface style: content
 | 4.5:1 text contrast | 7:1 for all text, in every theme | The user may have some remaining vision; 7:1 is the project rule (principle 8). |
 | 44 by 44 pt targets | 64 pt for primary controls, 48 pt for the rest | Buttons are found by touch and memory, not by sight. |
 | SF Symbols only | Inline line icons drawn to match | SF Symbols cannot be used on the web. Every icon is decorative and sits next to a visible text label. |
+| Standard gestures only | One custom gesture: a sideways swipe between the camera's modes | The owner's decision, to match the iPhone's Camera. The modes are also tabs, because VoiceOver keeps one-finger swipes for itself. |
 | Full Dynamic Type | Fixed, large sizes (body text 24 pt) | The reading sizes are already at the large end; scaling the whole layout with Dynamic Type is left for later. |
 | Semantic system colours | Tokens named after them, four themes | Automatic (the default) follows the iPhone's light or dark mode; Light, Dark, and Black and yellow can be chosen in Settings. |
 
 ## Visual system
 
-- **Material.** Glass (translucent, blurred) only for the control layer that floats above content: the reading toolbar, the navigation bars of Settings and Ask, and the camera controls, which are always dark glass over the live picture. Content is never glass, and glass never sits on glass. Glass is 84% opaque so text keeps 7:1 over anything behind it. With Reduce Transparency or Increase Contrast, glass becomes solid.
+- **Material.** Glass (translucent, blurred) only for the control layer that floats above content: the reading toolbar, the navigation bars of Settings and Ask, and the camera controls, which are always dark glass. Content is never glass, and glass never sits on glass. Glass is 84% opaque so text keeps 7:1 over anything behind it. With Reduce Transparency or Increase Contrast, glass becomes solid.
 - **Type.** The system font (SF Pro on the iPhone). Large Title for screen titles (36 pt bold), Title for the document's section headings, Body for the transcript (24 pt), Headline for button labels (semibold), Footnote for group footers. Weight, not colour, carries emphasis.
 - **Colour.** One accent (deep blue in Light, light blue in Dark, yellow in Black and yellow), used only for the one primary action, selected states, and text buttons such as Done. Red only for New document, the one destructive action. Everything else is label, secondary label, and grey fills.
 - **Buttons.** Filled accent for the primary action; tinted grey fills for the rest; no borders or shadows. Borders appear only in Black and yellow and with Increase Contrast, as iOS does.
@@ -23,7 +24,7 @@ This spec follows the owner's design brief (Apple Human Interface style: content
 
 ## Navigation
 
-One model: a stack with the camera at its root. Start leads to the camera; a capture or a PDF leads to Reading; Ask and Settings open as modal screens with Done in the navigation bar. Everything the user does on a screen is also spoken, and every screen has exactly one heading level 1.
+One model: a stack with the camera at its root. Start leads to the camera, whose modes (PDF, Camera, Photos) are one swipe apart; a capture, a PDF, or a photo leads to Reading; Ask and Settings open as modal screens with Done in the navigation bar. Everything the user does on a screen is also spoken, and every screen has exactly one heading level 1.
 
 ## Screens
 
@@ -51,13 +52,13 @@ One model: a stack with the camera at its root. Start leads to the camera; a cap
 4. **States.** Default; checking ("Checking…"); wrong ("That passcode is not right. Try again.", spoken and focused).
 5. **Left out.** Settings on this screen: nothing there is needed before the passcode.
 
-### Camera (capture)
+### Camera (home)
 
-1. **Goal.** Get a readable photo of the page, automatically or with one tap.
-2. **Hierarchy.** The live picture (content, full screen); the Capture panel (the one primary action, Title 1 label under a shutter); the current cue ("I can't see a page.", "Hold still.") in a small capsule; More.
-3. **Layout.** The picture fills the screen edge to edge. More is a glass capsule in the top-trailing corner; its menu opens under it (Open a PDF, Use phone camera instead, Settings). The status capsule is centred below. The Capture panel is dark glass across the bottom 30% of the screen with rounded top corners; the whole panel is the button.
-4. **States.** Starting ("Starting the camera…"); ready ("Camera ready." spoken, then cues as needed); capturing ("Capturing…", shutter dimmed); camera refused or unavailable (the panel becomes "Use phone camera instead"); error (the message in yellow in the capsule, spoken). When adding or retaking a page, "Back to reading" appears top-leading and the app says "Add page 2." or "Retake page 1.".
-5. **Left out.** Any spoken or written instructions about where to put the phone, the framing guide box, and the visible screen title: the picture and one Capture control are all a sighted helper needs, and the spoken cues cover the rest.
+1. **Goal.** Get something to read with as little effort as possible: a page in front of the phone, a PDF, or a photo already on the phone.
+2. **Hierarchy.** The live picture (content) with a box around the page the camera sees; the mode strip, PDF, Camera, Photos (Headline, the selected one in yellow, as on the iPhone's Camera); the action panel under it, the one primary action (Title 1 label: Capture, Choose a PDF, or Choose a photo); the current cue ("I can't see a page.", "Hold still.") in a small capsule; More.
+3. **Layout.** The picture fills the space above the panel and is shown whole, so it is exactly what the photo will hold. The page box follows the page's four corners, tilted or not: a white line while the page is being lined up, a green line and a light green fill when the picture is taken. More is a glass capsule in the top-trailing corner (Use phone camera instead, Settings). The status capsule is centred below it. The dark panel across the bottom holds the mode strip and, under it, the action button, which is the rest of the panel. A sideways swipe anywhere on the screen moves to the next mode, as on the iPhone's Camera; tapping a mode does the same. In PDF and Photos the picture gives way to a large icon and one line of text.
+4. **States.** Starting ("Starting the camera…"); ready ("Camera ready." spoken, with "Swipe left or right for PDF and Photos." until the user has changed mode once, then cues as needed); page seen (white box); capturing (green box, "Capturing…", shutter dimmed); camera refused or unavailable (the panel becomes "Use phone camera instead"); error (the message in yellow in the capsule, spoken); mode changed (the mode's name and what to do, spoken: "PDF. Tap the bottom of the screen to choose a file."; at either end a swipe says the current mode again). When adding or retaking a page, "Back to reading" appears top-leading and the app says "Add page 2." or "Retake page 1.".
+5. **Left out.** Any spoken or written instructions about where to put the phone, and the visible screen title: the picture, the page box, and one action are all a sighted helper needs, and the spoken cues cover the rest. Settings is not a mode: it is changed rarely, so it stays behind More.
 
 ### Reading
 

@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { CAMERA_MODE_NAMES, CAMERA_MODES, SwipeTracker, type CameraMode } from "@/lib/client/cameraModes";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { BackIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
+import { PageOutline } from "../PageOutline";
 import { Button, MoreButton } from "../ui";
 
 /**
- * Screen 1, the capture screen. The live picture is the content and fills the screen; the
- * controls float above it on dark glass: a short status line, More (Open a PDF, the phone's own
- * camera, Settings), and one large Capture panel across the bottom. The preview is hidden from
- * VoiceOver: there is nothing useful to describe.
+ * Screen 1, the home screen, built like the iPhone's Camera. Three modes sit in a strip above
+ * one large action panel: PDF, Camera, and Photos. Swipe left or right anywhere on the screen,
+ * or tap a mode, to move between them; the app says each mode's name. In Camera mode the live
+ * picture shows a box around the page it sees; the preview is hidden from VoiceOver, since every
+ * change is spoken. VoiceOver takes sideways swipes for itself, so its users switch modes with
+ * the tabs.
  */
 export function CameraScreen() {
   const controller = useController();
@@ -18,10 +22,14 @@ export function CameraScreen() {
   const session = useStore(controller.session.store);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const [more, setMore] = useState(false);
+  const [swipe] = useState(() => new SwipeTracker());
+  /** When the last swipe ended: the click that follows a swipe with a mouse is not a tap. */
+  const lastSwipeAt = useRef(-Infinity);
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
 
@@ -32,130 +40,212 @@ export function CameraScreen() {
     return () => controller.detachVideo();
   }, [controller]);
 
+  const mode = ui.cameraMode;
   const docInProgress = (session.doc?.pages.length ?? 0) > 0;
   const cameraFailed = ui.cameraStatus === "error";
   const openPhoneCamera = () => fileRef.current?.click();
+  const openPhotoPicker = () => photoRef.current?.click();
   const openPdfPicker = () => pdfRef.current?.click();
   const status = ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage;
 
+  const chooseMode = (next: CameraMode) => {
+    controller.setCameraMode(next);
+    document.getElementById(`mode-${next}`)?.focus();
+  };
+  // Arrow keys move between the tabs, as in any tab list.
+  const onTabKey = (event: KeyboardEvent) => {
+    const index = CAMERA_MODES.indexOf(mode);
+    const next =
+      event.key === "ArrowRight" ? CAMERA_MODES[index + 1] : event.key === "ArrowLeft" ? CAMERA_MODES[index - 1] : undefined;
+    if (!next) return;
+    event.preventDefault();
+    chooseMode(next);
+  };
+
+  const action = actionFor(mode, cameraFailed, ui.capturing);
+  const onAction = mode === "pdf" ? openPdfPicker : mode === "photos" ? openPhotoPicker : cameraFailed ? openPhoneCamera : () => void controller.captureManual();
+
   return (
-    <main className="relative h-dvh overflow-hidden bg-black text-on-scrim">
-      <video
-        ref={videoRef}
-        aria-hidden="true"
-        tabIndex={-1}
-        muted
-        playsInline
-        autoPlay
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="relative z-10 flex h-full flex-col">
-        <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          {/* The screen's name for VoiceOver; sighted users see the picture itself. */}
-          <h1 ref={headingRef} tabIndex={-1} className="sr-only">
-            {ui.cameraTitle}
-          </h1>
-          {docInProgress ? (
-            <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" className="rounded-full" onClick={() => controller.backToReading()} />
-          ) : (
-            <span />
-          )}
-          <div className="flex flex-col items-end gap-2">
-            <MoreButton
-              expanded={more}
-              onToggle={() => setMore((open) => !open)}
-              controls="more-camera-options"
-              icon={<MoreIcon />}
-              variant="glass"
-              className="rounded-full"
-            />
-            <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
-              <MenuItem label="Open a PDF" icon={<PdfIcon />} onClick={openPdfPicker} />
-              {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
-              <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+    <main
+      className="flex h-dvh touch-pan-y touch-pinch-zoom select-none flex-col overflow-hidden bg-black text-on-scrim"
+      onPointerDown={(event) => {
+        if (event.isPrimary) swipe.down(event.clientX, event.clientY, event.timeStamp, event.pointerId);
+      }}
+      onPointerUp={(event) => {
+        const direction = swipe.up(event.clientX, event.clientY, event.timeStamp, event.pointerId);
+        if (!direction) return;
+        lastSwipeAt.current = event.timeStamp;
+        controller.swipeCameraMode(direction);
+      }}
+      onPointerCancel={() => swipe.cancel()}
+      onClickCapture={(event) => {
+        if (event.timeStamp - lastSwipeAt.current < 500) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+    >
+      {/* The picture, shown whole so it is exactly what the photo will hold, with the box
+          around the page and the floating controls over it. */}
+      <div className="relative min-h-0 flex-1">
+        <video
+          ref={videoRef}
+          aria-hidden="true"
+          tabIndex={-1}
+          muted
+          playsInline
+          autoPlay
+          className={`absolute inset-0 h-full w-full object-contain ${mode === "camera" ? "" : "invisible"}`}
+        />
+        <PageOutline videoRef={videoRef} />
+        {mode !== "camera" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-8 text-center" data-testid="mode-intro">
+            {mode === "pdf" ? <PdfIcon className="h-24 w-24" /> : <PhotoIcon className="h-24 w-24" />}
+            <p className="max-w-xs text-2xl font-semibold leading-snug">
+              {mode === "pdf" ? "Read a PDF from Files, Mail, or iCloud Drive." : "Read a photo or a screenshot from your library."}
+            </p>
+          </div>
+        )}
+        <div className="relative z-10 flex h-full flex-col">
+          <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            {/* The screen's name for VoiceOver; sighted users see the picture itself. */}
+            <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+              {ui.cameraTitle}
+            </h1>
+            {docInProgress ? (
+              <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" className="rounded-full" onClick={() => controller.backToReading()} />
+            ) : (
+              <span />
+            )}
+            <div className="flex flex-col items-end gap-2">
+              <MoreButton
+                expanded={more}
+                onToggle={() => setMore((open) => !open)}
+                controls="more-camera-options"
+                icon={<MoreIcon />}
+                variant="glass"
+                className="rounded-full"
+              />
+              <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
+                {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
+                <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
-          {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
-          {status && (
-            <p
-              className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
-              data-testid="camera-status"
+          <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
+            {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
+            {mode === "camera" && status && (
+              <p
+                className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
+                data-testid="camera-status"
+              >
+                {status}
+              </p>
+            )}
+            {ui.errorText && (
+              <p ref={errorRef} tabIndex={-1} className="glass-dark max-w-full rounded-3xl px-5 py-2 text-center text-xl font-semibold text-highlight">
+                {ui.errorText}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* The iPhone's own camera app: works in other apps' browsers and when the live preview
+          fails. A photo or screenshot from the library. And a PDF from Files, iCloud Drive, or a
+          mail attachment saved to Files. */}
+      <FileInput inputRef={fileRef} accept="image/*" capture testId="phone-camera-input" onFile={(file) => void controller.captureFromFile(file)} />
+      <FileInput inputRef={photoRef} accept="image/*" testId="photo-input" onFile={(file) => void controller.captureFromFile(file)} />
+      <FileInput inputRef={pdfRef} accept="application/pdf,.pdf" testId="pdf-input" onFile={(file) => void controller.openPdf(file)} />
+
+      <div className="glass-dark flex shrink-0 flex-col rounded-t-[2rem] border-2 border-b-0 border-button-border pb-[env(safe-area-inset-bottom)]">
+        {/* The modes, like Photo, Video, and Slo-mo on the iPhone's Camera. */}
+        <div role="tablist" aria-label="Modes" className="flex justify-center gap-1 px-2 pt-2" onKeyDown={onTabKey}>
+          {CAMERA_MODES.map((m) => (
+            <button
+              key={m}
+              id={`mode-${m}`}
+              type="button"
+              role="tab"
+              aria-selected={m === mode}
+              aria-controls="camera-mode-panel"
+              tabIndex={m === mode ? 0 : -1}
+              onClick={() => chooseMode(m)}
+              className={`min-h-12 min-w-24 rounded-full px-4 text-xl font-bold tracking-wide uppercase ${
+                m === mode ? "text-mode-selected" : "text-mode-idle"
+              }`}
             >
-              {status}
-            </p>
-          )}
-          {ui.errorText && (
-            <p ref={errorRef} tabIndex={-1} className="glass-dark max-w-full rounded-3xl px-5 py-2 text-center text-xl font-semibold text-highlight">
-              {ui.errorText}
-            </p>
-          )}
+              {CAMERA_MODE_NAMES[m]}
+            </button>
+          ))}
         </div>
 
-        {/* The iPhone's own camera app: works in other apps' browsers and when the live preview
-            fails. And a PDF from Files, iCloud Drive, or a mail attachment saved to Files. */}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="hidden"
-          data-testid="phone-camera-input"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (file) void controller.captureFromFile(file);
-          }}
-        />
-        <input
-          ref={pdfRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="hidden"
-          data-testid="pdf-input"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (file) void controller.openPdf(file);
-          }}
-        />
-
-        {/* The one primary action: the whole bottom panel is the button. */}
-        <button
-          type="button"
-          onClick={cameraFailed ? openPhoneCamera : () => void controller.captureManual()}
-          aria-disabled={ui.capturing}
-          className="glass-dark group flex h-[30dvh] min-h-36 w-full shrink-0 flex-col items-center justify-center gap-3 rounded-t-[2rem] border-2 border-b-0 border-button-border pb-[env(safe-area-inset-bottom)] text-on-scrim"
-        >
-          {cameraFailed ? (
-            <PhotoIcon className="h-14 w-14" />
-          ) : (
-            <span aria-hidden="true" className={`block h-20 w-20 rounded-full border-4 border-white p-1.5 ${ui.capturing ? "opacity-50" : ""}`}>
-              <span className="block h-full w-full rounded-full bg-white transition-transform duration-150 group-active:scale-90" />
-            </span>
-          )}
-          <span className="text-3xl font-bold tracking-tight">
-            {cameraFailed
-              ? ui.capturing
-                ? "Reading the photo…"
-                : "Use phone camera instead"
-              : ui.capturing
-                ? "Capturing…"
-                : "Capture"}
-          </span>
-        </button>
+        {/* The one primary action: the rest of the panel is the button. */}
+        <div role="tabpanel" id="camera-mode-panel" aria-labelledby={`mode-${mode}`}>
+          <button
+            type="button"
+            onClick={onAction}
+            aria-disabled={ui.capturing}
+            className="group flex h-[24dvh] min-h-28 w-full flex-col items-center justify-center gap-3 text-on-scrim"
+          >
+            {action.icon}
+            <span className="text-3xl font-bold tracking-tight">{action.label}</span>
+          </button>
+        </div>
       </div>
     </main>
   );
 }
 
-function MenuItem({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
+/** The large button's icon and label for each mode. */
+function actionFor(mode: CameraMode, cameraFailed: boolean, capturing: boolean): { icon: ReactNode; label: string } {
+  if (mode === "pdf") return { icon: <PdfIcon className="h-14 w-14" />, label: capturing ? "Opening the PDF…" : "Choose a PDF" };
+  if (mode === "photos") return { icon: <PhotoIcon className="h-14 w-14" />, label: capturing ? "Reading the photo…" : "Choose a photo" };
+  if (cameraFailed) return { icon: <PhotoIcon className="h-14 w-14" />, label: capturing ? "Reading the photo…" : "Use phone camera instead" };
+  return {
+    icon: (
+      <span aria-hidden="true" className={`block h-20 w-20 rounded-full border-4 border-white p-1.5 ${capturing ? "opacity-50" : ""}`}>
+        <span className="block h-full w-full rounded-full bg-white transition-transform duration-150 group-active:scale-90" />
+      </span>
+    ),
+    label: capturing ? "Capturing…" : "Capture",
+  };
+}
+
+function FileInput({
+  inputRef,
+  accept,
+  capture,
+  testId,
+  onFile,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  accept: string;
+  capture?: boolean;
+  testId: string;
+  onFile: (file: File) => void;
+}) {
+  return (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={accept}
+      capture={capture ? "environment" : undefined}
+      tabIndex={-1}
+      aria-hidden="true"
+      className="hidden"
+      data-testid={testId}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (file) onFile(file);
+      }}
+    />
+  );
+}
+
+function MenuItem({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"

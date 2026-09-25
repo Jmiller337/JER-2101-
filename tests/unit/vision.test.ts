@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { analyzeFrame, findPage, frameDifference, laplacianVariance, toLuma } from "@/lib/client/vision/analysis";
+import { analyzeFrame, findPage, frameDifference, laplacianVariance, toLuma, type Quad } from "@/lib/client/vision/analysis";
 import { CuePolicy, cueFor, directionCue, FramingTracker, type Situation } from "@/lib/client/vision/framing";
+import { alignQuad, approachQuad, containRect, normalizeQuad, placeQuad } from "@/lib/client/vision/outline";
 import { blurFrame, makeFrame } from "../helpers/frames";
 
 const CENTERED = { x0: 0.2, y0: 0.1, x1: 0.8, y1: 0.9 };
@@ -38,6 +39,100 @@ describe("findPage", () => {
     const page = findPage(toLuma(makeFrame({ page: { x0: -0.1, y0: -0.1, x1: 1.1, y1: 1.1 } })));
     expect(page.found).toBe(true);
     expect(page.touches.left && page.touches.right).toBe(true);
+  });
+});
+
+/** The corners of a page rectangle (fractions of a 160 by 120 frame) turned about its centre. */
+function turnedCorners(page: { x0: number; y0: number; x1: number; y1: number }, degrees: number) {
+  const [x0, x1, y0, y1] = [page.x0 * 160, page.x1 * 160, page.y0 * 120, page.y1 * 120];
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const t = (degrees * Math.PI) / 180;
+  return [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ].map(([x, y]) => ({
+    x: cx + (x! - cx) * Math.cos(t) - (y! - cy) * Math.sin(t),
+    y: cy + (x! - cx) * Math.sin(t) + (y! - cy) * Math.cos(t),
+  }));
+}
+
+/** The largest distance from each true corner to the nearest found corner. */
+function cornerError(found: Quad | null, truth: Array<{ x: number; y: number }>): number {
+  if (!found) return Infinity;
+  return Math.max(...truth.map((t) => Math.min(...found.map((f) => Math.hypot(f.x - t.x, f.y - t.y)))));
+}
+
+describe("page corners", () => {
+  const page = { x0: 0.25, y0: 0.15, x1: 0.75, y1: 0.85 };
+
+  it("finds the corners of an upright page exactly", () => {
+    const found = findPage(toLuma(makeFrame({ page })));
+    expect(found.quad).toEqual([
+      { x: 40, y: 18 },
+      { x: 120, y: 18 },
+      { x: 120, y: 102 },
+      { x: 40, y: 102 },
+    ]);
+  });
+
+  it("follows a tilted page's corners at any angle", () => {
+    for (const angle of [8, -15, 20, 35, 44, 60]) {
+      const found = findPage(toLuma(makeFrame({ page, angle })));
+      expect(found.strategy, `at ${angle} degrees`).toBe("bright");
+      // Within 4 pixels of 160 (2.5% of the picture): the pixel grid rounds a turned corner inward.
+      expect(cornerError(found.quad, turnedCorners(page, angle)), `at ${angle} degrees`).toBeLessThan(4);
+    }
+  });
+
+  it("outlines a white page on a white table by the box around its text", () => {
+    const found = findPage(toLuma(makeFrame({ page, background: 222 })));
+    expect(found.strategy).toBe("edges");
+    const box = found.box!;
+    expect(found.quad).toEqual([
+      { x: box.x0, y: box.y0 },
+      { x: box.x1 + 1, y: box.y0 },
+      { x: box.x1 + 1, y: box.y1 + 1 },
+      { x: box.x0, y: box.y1 + 1 },
+    ]);
+  });
+});
+
+describe("drawing the box", () => {
+  const square: Quad = [
+    { x: 0.25, y: 0.25 },
+    { x: 0.75, y: 0.25 },
+    { x: 0.75, y: 0.75 },
+    { x: 0.25, y: 0.75 },
+  ];
+
+  it("places the page where the whole picture is shown", () => {
+    // A landscape picture in a portrait box: bars above and below.
+    expect(containRect(480, 360, 390, 600)).toEqual({ x: 0, y: 153.75, width: 390, height: 292.5 });
+    // A portrait picture in a wider box: bars at the sides.
+    expect(containRect(1080, 1920, 390, 600)).toEqual({ x: 26.25, y: 0, width: 337.5, height: 600 });
+    expect(containRect(0, 0, 390, 600)).toBeNull();
+    const placed = placeQuad(normalizeQuad([{ x: 40, y: 30 }, { x: 120, y: 30 }, { x: 120, y: 90 }, { x: 40, y: 90 }], 160, 120), {
+      x: 10,
+      y: 20,
+      width: 320,
+      height: 240,
+    });
+    expect(placed[0]).toEqual({ x: 90, y: 80 });
+    expect(placed[2]).toEqual({ x: 250, y: 200 });
+  });
+
+  it("glides toward the new corners without spinning when they are named from another corner", () => {
+    const renamed: Quad = [square[2], square[3], square[0], square[1]];
+    expect(alignQuad(square, renamed)).toEqual(square);
+    const moved = square.map((p) => ({ x: p.x + 0.1, y: p.y })) as Quad;
+    const halfway = approachQuad(square, [moved[1], moved[2], moved[3], moved[0]], 0.5);
+    halfway.forEach((p, k) => {
+      expect(p.x).toBeCloseTo(square[k]!.x + 0.05);
+      expect(p.y).toBeCloseTo(square[k]!.y);
+    });
   });
 });
 
@@ -95,21 +190,50 @@ describe("FramingTracker", () => {
 
   it("reports blur when the page goes soft after calibration", () => {
     const tracker = new FramingTracker();
+    // Only the strict checks: the calm capture is covered below.
+    tracker.calmMs = Infinity;
     for (let i = 0; i < 10; i++) tracker.update(makeFrame({ seed: i + 1 }), i * 100);
     let last: Situation = { kind: "noPage" };
     for (let i = 10; i < 20; i++) last = tracker.update(blurFrame(makeFrame({ seed: i + 1 }), 2), i * 100);
     expect(last.kind).toBe("blurry");
   });
 
-  it("captures a page that stays cut off once the phone has been calm for three seconds", () => {
+  it("captures a page that stays cut off once the phone has been calm for a second and a half", () => {
     const tracker = new FramingTracker();
     const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
     const kinds: string[] = [];
-    for (let i = 0; i < 40; i++) kinds.push(tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100).kind);
-    expect(kinds[15]).toBe("cutOff");
-    expect(kinds[29]).toBe("cutOff");
-    expect(kinds[32]).toBe("ready");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 41 }), 4000)).toEqual({ kind: "ready", lenient: true });
+    for (let i = 0; i < 20; i++) kinds.push(tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100).kind);
+    expect(kinds[10]).toBe("cutOff");
+    expect(kinds[14]).toBe("cutOff");
+    expect(kinds[15]).toBe("ready");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 41 }), 2000)).toEqual({ kind: "ready", lenient: true });
+  });
+
+  it("captures a tilted page, a blurry page, and a dim page once the phone is calm", () => {
+    const calmly = (spec: Parameters<typeof makeFrame>[0], blurFrom = Infinity) => {
+      const tracker = new FramingTracker();
+      const seen: Situation[] = [];
+      for (let i = 0; i < 20; i++) {
+        const frame = makeFrame({ ...spec, seed: i + 1 });
+        seen.push(tracker.update(i >= blurFrom ? blurFrame(frame, 2) : frame, i * 100));
+      }
+      return seen;
+    };
+    const strictReady = (seen: Situation[]) => seen.some((s) => s.kind === "ready" && !s.lenient);
+    // Tilted and running off the bottom of the picture.
+    const tilted = calmly({ page: { x0: 0.25, y0: 0.3, x1: 0.75, y1: 1.1 }, angle: 12 });
+    expect(tilted[10]?.kind).toBe("cutOff");
+    expect(strictReady(tilted)).toBe(false);
+    expect(tilted.at(-1)).toEqual({ kind: "ready", lenient: true });
+    // Gone soft after the sharpness baseline was set, so the strict checks never pass.
+    const blurry = calmly({}, 8);
+    expect(strictReady(blurry)).toBe(false);
+    expect(blurry.at(-1)).toEqual({ kind: "ready", lenient: true });
+    // Too dim for the strict checks, bright enough to be brightened and read.
+    const dim = calmly({ light: 0.34 });
+    expect(dim[10]?.kind).toBe("dark");
+    expect(strictReady(dim)).toBe(false);
+    expect(dim.at(-1)).toEqual({ kind: "ready", lenient: true });
   });
 
   it("stays calm through a slight hand tremor but not through real movement", () => {
@@ -150,8 +274,8 @@ describe("FramingTracker", () => {
     expect(last.kind).toBe("ready");
     tracker.resetSteady();
     expect(tracker.update(makeFrame({ page: cutOff, seed: 36 }), 3500).kind).toBe("cutOff");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 37 }), 5000).kind).toBe("cutOff");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 38 }), 6600).kind).toBe("ready");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 37 }), 4900).kind).toBe("cutOff");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 38 }), 5000).kind).toBe("ready");
   });
 
   it("checks a captured still against the preview's sharpness", () => {
@@ -172,6 +296,7 @@ describe("cues", () => {
   it("asks for Capture when automatic capture is off", () => {
     expect(cueFor({ kind: "ready", lenient: false }, true)).toBeNull();
     expect(cueFor({ kind: "ready", lenient: false }, false)).toBe("I see the whole page. Press Capture.");
+    expect(cueFor({ kind: "ready", lenient: true }, false)).toBe("Ready. Press Capture.");
     expect(cueFor({ kind: "settling" }, true)).toBeNull();
   });
 });

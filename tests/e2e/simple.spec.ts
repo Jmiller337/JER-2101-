@@ -14,13 +14,13 @@ test("the reading screen starts with only its core controls, the rest behind Mor
   }
 });
 
-test("the camera screen shows only More and Capture over the picture", async ({ page }) => {
+test("the camera screen shows only its modes, More, and Capture over the picture", async ({ page }) => {
   await openToCamera(page);
   await expect(page.getByRole("button")).toHaveText([/More/, /Capture/]);
+  await expect(page.getByRole("tab")).toHaveText(["PDF", "Camera", "Photos"]);
+  await expect(page.getByRole("tab", { name: "Camera" })).toHaveAttribute("aria-selected", "true");
   await openMore(page);
-  for (const name of ["Open a PDF", "Use phone camera instead", "Settings"]) {
-    await expect(page.getByRole("button", { name })).toBeVisible();
-  }
+  await expect(page.locator("#more-camera-options").getByRole("button")).toHaveText(["Use phone camera instead", "Settings"]);
 });
 
 test("the camera never tells the user where to put the phone", async ({ page }) => {

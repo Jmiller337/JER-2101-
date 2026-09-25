@@ -6,9 +6,11 @@ const TITLE = "A two-page letter from Riverside Library about a returned book";
 
 test("a PDF from the phone's files is read aloud, every page, in order", async ({ page }) => {
   await openToCamera(page);
-  await openMore(page);
-  await expect(page.getByRole("button", { name: "Open a PDF" })).toBeVisible();
-  await page.getByTestId("pdf-input").setInputFiles(PDF);
+  await page.getByRole("tab", { name: "PDF" }).click();
+  await expectSpoken(page, "PDF. Tap the bottom of the screen to choose a file.");
+  const fileChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose a PDF" }).click();
+  await (await fileChooser).setFiles(PDF);
   await expectSpoken(page, "Got it. Reading the PDF.");
   await expect(page.getByRole("heading", { level: 1, name: TITLE })).toBeVisible();
   await expect(page.getByTestId("transcript")).toContainText("Late fee: $2.40.");

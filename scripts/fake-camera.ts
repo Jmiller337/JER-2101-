@@ -14,6 +14,8 @@ export interface PageRect {
   /** Page size as a fraction of the frame width and height. */
   w: number;
   h: number;
+  /** Turned this many degrees clockwise about its centre (a page not lined up with the phone). */
+  angle?: number;
 }
 
 export interface Keyframe {
@@ -54,6 +56,7 @@ function frameAt(spec: VideoSpec, t: number, rand: () => number): { page: PageRe
       cy: page.cy + (next.page.cy - page.cy) * f,
       w: page.w + (next.page.w - page.w) * f,
       h: page.h + (next.page.h - page.h) * f,
+      angle: page.angle,
     };
   }
   const jitter = (current.jitter ?? 0) * (rand() * 2 - 1);
@@ -86,15 +89,23 @@ export function writeY4m(file: string, spec: VideoSpec): void {
     }
     const pageW = x1 - x0;
     const pageH = y1 - y0;
+    const turn = ((page?.angle ?? 0) * Math.PI) / 180;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
     for (let row = 0; row < H; row++) {
       for (let col = 0; col < W; col++) {
         let v: number;
-        const inPage = page && col >= x0 && col < x1 && row >= y0 && row < y1;
+        // A turned page: turn the pixel back about the page centre to find where it falls.
+        const pc = turn ? cx + (col - cx) * cos + (row - cy) * sin : col;
+        const pr = turn ? cy - (col - cx) * sin + (row - cy) * cos : row;
+        const inPage = page && pc >= x0 && pc < x1 && pr >= y0 && pr < y1;
         if (inPage) {
           v = 232;
           // Text lines: rows of dark bars inside 10% margins, every ~6% of the page height.
-          const px = (col - x0) / pageW;
-          const py = (row - y0) / pageH;
+          const px = (pc - x0) / pageW;
+          const py = (pr - y0) / pageH;
           if (px > 0.1 && px < 0.9 && py > 0.1 && py < 0.9) {
             const line = (py - 0.1) / 0.06;
             const inLine = line - Math.floor(line) < 0.35;
@@ -141,6 +152,15 @@ export const VIDEOS: Record<string, VideoSpec> = {
   },
   // A dark room.
   "dark-room": { width: 480, height: 360, fps: 10, seconds: 3, keyframes: [{ at: 0, page: CENTERED }], light: 0.2 },
+  // A portrait picture of a page turned 12 degrees and running off the bottom, with a slight
+  // hand tremor: never framed well enough for the strict checks.
+  "tilted-page": {
+    width: 360,
+    height: 480,
+    fps: 10,
+    seconds: 8,
+    keyframes: [{ at: 0, page: { cx: 0.5, cy: 0.62, w: 0.72, h: 0.7, angle: 12 }, jitter: 2 }],
+  },
   // A page held too close, overflowing the frame on every side, with a slight hand tremor.
   "page-too-close": {
     width: 480,

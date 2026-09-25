@@ -90,6 +90,19 @@ describe("settings", () => {
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("remembers that the camera modes have been learned, and settings saved before it existed still load", () => {
+    const storage = new MemoryStorage();
+    expect(loadSettings(storage).modesLearned).toBe(false);
+    saveSettings(storage, { ...DEFAULT_SETTINGS, modesLearned: true });
+    expect(loadSettings(storage).modesLearned).toBe(true);
+    const older: Partial<typeof DEFAULT_SETTINGS> = { ...DEFAULT_SETTINGS, rate: 1.4 };
+    delete older.modesLearned;
+    storage.setItem("docreader.settings.v1", JSON.stringify(older));
+    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, rate: 1.4 });
+    storage.setItem("docreader.settings.v1", JSON.stringify({ ...DEFAULT_SETTINGS, modesLearned: "yes" }));
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
+  });
+
   it("round-trips and clamps the rate", () => {
     const storage = new MemoryStorage();
     saveSettings(storage, { ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 1.5, sounds: false });

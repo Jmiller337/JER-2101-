@@ -51,7 +51,11 @@ export const FRAMING = {
    * reliable than these heuristics on a real phone.
    */
   calmShift: 3,
-  calmMs: 3000,
+  calmMs: 1500,
+  /** The calm capture still needs this much light on the page (dim photos are brightened). */
+  calmDarkPageMean: 55,
+  /** ...and a page covering at least this fraction of the frame. */
+  calmMinCoverage: 0.05,
   /** Below this fraction of the frame the page is too far away. A fully visible letter-sized
    * page covers about 40 to 55 percent of a portrait frame, so this is deliberately low. */
   tooSmallCoverage: 0.2,
@@ -101,12 +105,18 @@ export class FramingTracker {
       this.calmRef = null;
     }
     const calibrated = this.frames >= FRAMING.calibrationFrames;
-    const veryDark = analysis.frameMean < FRAMING.darkFrameMean;
-    if (page.found && !veryDark && calibrated && this.calmRef && now - this.calmRef.since >= this.calmMs) {
+    const calm = this.calmRef !== null && now - this.calmRef.since >= this.calmMs;
+    if (
+      page.found &&
+      calm &&
+      calibrated &&
+      analysis.pageMean >= FRAMING.calmDarkPageMean &&
+      page.coverage >= FRAMING.calmMinCoverage
+    ) {
       return { kind: "ready", lenient: true };
     }
 
-    const dark = page.found ? analysis.pageMean < FRAMING.darkPageMean : veryDark;
+    const dark = page.found ? analysis.pageMean < FRAMING.darkPageMean : analysis.frameMean < FRAMING.darkFrameMean;
     if (dark) return { kind: "dark" };
     if (!page.found) return { kind: "noPage" };
     const t = page.touches;
@@ -165,7 +175,8 @@ export function cueFor(situation: Situation, autoCapture: boolean): string | nul
     case "settling":
       return null;
     case "ready":
-      return autoCapture ? null : "I see the whole page. Press Capture.";
+      if (autoCapture) return null;
+      return situation.lenient ? "Ready. Press Capture." : "I see the whole page. Press Capture.";
   }
 }
 

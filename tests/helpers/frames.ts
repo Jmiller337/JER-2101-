@@ -15,6 +15,8 @@ export interface FrameSpec {
   glare?: { x: number; y: number; r: number };
   /** Shift the whole page by this many pixels (hand movement). */
   shift?: number;
+  /** Turn the page by this many degrees (clockwise on screen) about its centre. */
+  angle?: number;
   seed?: number;
 }
 
@@ -29,6 +31,9 @@ export function makeFrame(spec: FrameSpec = {}): PixelFrame {
   const light = spec.light ?? 1;
   const noise = spec.noise ?? 4;
   const shift = spec.shift ?? 0;
+  const turn = ((spec.angle ?? 0) * Math.PI) / 180;
+  const cos = Math.cos(turn);
+  const sin = Math.sin(turn);
   let seed = spec.seed ?? 1;
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -43,10 +48,15 @@ export function makeFrame(spec: FrameSpec = {}): PixelFrame {
         const px1 = page.x1 * width + shift;
         const py0 = page.y0 * height;
         const py1 = page.y1 * height;
-        if (x >= px0 && x < px1 && y >= py0 && y < py1) {
+        // Turn the pixel back about the page centre to find where it falls on the page.
+        const cx = (px0 + px1) / 2;
+        const cy = (py0 + py1) / 2;
+        const qx = turn ? cx + (x + 0.5 - cx) * cos + (y + 0.5 - cy) * sin - 0.5 : x;
+        const qy = turn ? cy - (x + 0.5 - cx) * sin + (y + 0.5 - cy) * cos - 0.5 : y;
+        if (qx >= px0 && qx < px1 && qy >= py0 && qy < py1) {
           v = paper;
-          const u = (x - px0) / (px1 - px0);
-          const w = (y - py0) / (py1 - py0);
+          const u = (qx - px0) / (px1 - px0);
+          const w = (qy - py0) / (py1 - py0);
           if (u > 0.12 && u < 0.88 && w > 0.1 && w < 0.9) {
             const line = (w - 0.1) / 0.07;
             if (line - Math.floor(line) < 0.4 && (u * 30 + Math.floor(line)) % 6 < 4.8) v = ink;

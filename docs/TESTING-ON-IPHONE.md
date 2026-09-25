@@ -34,7 +34,10 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Slide the phone so the page is cut off on the left. The app says "Move left." Moving the phone to the left brings the page into view. Repeat for right ("Move right."), top ("Move away from you."), and bottom ("Move toward you."). **If any direction is backwards, write down which.**
 - [ ] Held very close (page overflowing the screen): "Lift the phone higher." Held far away: "Move closer to the page."
 - [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and reads the page. No button press needed.
-- [ ] Hold the phone too close (the page overflowing the screen) but still for about three seconds: the app takes the picture anyway, and either reads the page or says what to change. Note roughly how long it waited: ______ seconds.
+- [ ] Hold the phone too close (the page overflowing the screen) but still for about a second and a half: the app takes the picture anyway, and either reads the page or says what to change. Note roughly how long it waited: ______ seconds.
+- [ ] A white box is drawn around the page on the screen and follows it as the phone moves. Turn the page at an angle: the box turns with it and its corners sit on the page's corners. **If the box sits off the page, note by how much and in which direction.**
+- [ ] When the picture is taken the box turns green, then the app says "Got it. Reading."
+- [ ] Hard framings: the page at an angle, the page cut off at one edge, the page small in the picture, a dim room with one lamp. In each, holding the phone still for a second or two takes the picture. Note any case where it never does: ______
 - [ ] Hold the phone still over a page in the ordinary way for five seconds without pressing anything: the picture is taken. If it is not, note what the app said instead.
 - [ ] Cues are never faster than about one every one and a half seconds, and the same cue is not repeated within four seconds.
 - [ ] In a dark room: "Too dark. Turn on a light." (or, on a phone whose browser allows the flashlight, "It's dark, so I turned on the light." and the flashlight comes on).
@@ -66,7 +69,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 
 Before starting, save a PDF to the iPhone's Files app (for example a bill emailed as a PDF: open the attachment, tap Share, then Save to Files).
 
-- [ ] On the camera screen, press "Open a PDF". The file picker opens; choose the PDF.
+- [ ] On the camera screen, swipe right to PDF (the app says "PDF. Tap the bottom of the screen to choose a file."), then tap the bottom of the screen. The file picker opens; choose the PDF.
 - [ ] The app says "Got it. Reading the PDF.", then what the document is, then reads it.
 - [ ] Between pages it says "Page 2.", and it reads to the end of the last page.
 - [ ] Ask a question about something on the second page: the answer is right.
@@ -97,7 +100,17 @@ Before starting, save a PDF to the iPhone's Files app (for example a bill emaile
 ## 4b. Simple screens
 
 - [ ] While reading, only six buttons show: Back, Play, Forward, New document, Ask a question, More. More shows the rest and VoiceOver says "More, collapsed" or "expanded".
-- [ ] On the camera screen only More and the Capture panel show; More opens Open a PDF, Use phone camera instead, and Settings.
+- [ ] On the camera screen only More, the mode strip (PDF, Camera, Photos), and the Capture panel show; More opens Use phone camera instead and Settings.
+
+## 4c. Modes (like the iPhone's Camera)
+
+- [ ] The first time the camera opens, the app says "Camera ready. Swipe left or right for PDF and Photos." After the first mode change it says only "Camera ready.".
+- [ ] Swipe left anywhere on the screen: the strip moves to Photos (in yellow) and the app says "Photos. Tap the bottom of the screen to choose a photo." Swipe right twice: "Camera.", then "PDF. …". Swiping past either end says the current mode again.
+- [ ] A swipe that starts on the Capture panel changes mode and does not take a picture.
+- [ ] Tapping a mode's name does the same as swiping to it.
+- [ ] In PDF or Photos, the app does not talk about the page or take a picture, even with a page in view. Back in Camera, guidance and automatic capture start again.
+- [ ] Photos: tap the bottom of the screen, choose a photo or a screenshot from the library, and the app reads it.
+- [ ] Pinch to zoom still works on the camera screen, and swiping up or down does nothing.
 
 ## 4a. Colours and focus
 
@@ -126,6 +139,7 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] Nothing is announced twice.
 - [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and moving the speed slider reads the new speed once.
 - [ ] On the camera screen, VoiceOver reads "Camera ready." before the first framing cue.
+- [ ] VoiceOver finds the modes as tabs ("PDF, tab, 1 of 3"). Double-tapping one switches to it, VoiceOver says it is selected, and the app adds nothing of its own. (One-finger swipes belong to VoiceOver, so they move between items instead of changing mode; that is expected.)
 
 ## 7. Hard cases
 
