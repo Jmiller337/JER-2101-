@@ -80,10 +80,13 @@ export class CameraHandle {
 
   /**
    * A full-quality still. `ImageCapture.takePhoto()` (Safari 18.4+, Chrome) returns a
-   * full-sensor photo, sharper than a video frame; if it is missing, slow, or fails, the current
-   * video frame is used instead.
+   * full-sensor photo, sharper than a video frame; if it is missing, slow, or fails, a video
+   * frame is used instead: with `burst`, the sharpest of several frames taken a moment apart, so
+   * a shaking hand or a dim room does not decide the picture.
    */
-  async captureStill(): Promise<{ source: CanvasImageSource; width: number; height: number; method: string }> {
+  async captureStill(
+    opts: { burst?: number; intervalMs?: number; score?: (frame: HTMLCanvasElement) => number } = {},
+  ): Promise<{ source: CanvasImageSource; width: number; height: number; method: string }> {
     const Ctor = (window as unknown as { ImageCapture?: ImageCaptureCtor }).ImageCapture;
     if (Ctor && this.track.readyState === "live") {
       try {
@@ -96,8 +99,19 @@ export class CameraHandle {
         // fall back to a video frame
       }
     }
-    const frame = this.grabFrame();
-    return { source: frame, width: frame.width, height: frame.height, method: "videoFrame" };
+    const count = opts.score ? Math.max(1, opts.burst ?? 1) : 1;
+    const { item: frame } = await bestOfBurst(
+      () => this.grabFrame(),
+      opts.score ?? (() => 0),
+      count,
+      () => new Promise((resolve) => setTimeout(resolve, opts.intervalMs ?? 90)),
+      (unused) => {
+        // Release the canvas memory right away; iOS limits total canvas memory.
+        unused.width = 0;
+        unused.height = 0;
+      },
+    );
+    return { source: frame, width: frame.width, height: frame.height, method: count > 1 ? `videoFrame, best of ${count}` : "videoFrame" };
   }
 
   /** The current preview frame at the track's native resolution. */
@@ -113,6 +127,36 @@ export class CameraHandle {
     for (const track of this.stream.getTracks()) track.stop();
     this.video.srcObject = null;
   }
+}
+
+/**
+ * Takes `count` items a moment apart and keeps the one with the highest score (the sharpest
+ * frame); the others are handed to `release`.
+ */
+export async function bestOfBurst<T>(
+  grab: () => T,
+  score: (item: T) => number,
+  count: number,
+  wait: () => Promise<void>,
+  release: (item: T) => void = () => undefined,
+): Promise<{ item: T; index: number }> {
+  let best = grab();
+  let bestIndex = 0;
+  let bestScore = count > 1 ? score(best) : 0;
+  for (let i = 1; i < count; i++) {
+    await wait();
+    const item = grab();
+    const value = score(item);
+    if (value > bestScore) {
+      release(best);
+      best = item;
+      bestIndex = i;
+      bestScore = value;
+    } else {
+      release(item);
+    }
+  }
+  return { item: best, index: bestIndex };
 }
 
 /** Starts the rear camera in the given video element (PROMPT.md 6.1). */

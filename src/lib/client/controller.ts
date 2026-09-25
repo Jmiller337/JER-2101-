@@ -6,6 +6,7 @@ import { ApiError, createApiClient, type ApiClient } from "./api";
 import { Sounds } from "./audio/sounds";
 import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
 import { FrameSampler } from "./camera/frameSampler";
+import { laplacianVariance, toLuma } from "./vision/analysis";
 import { blobToBase64, imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
 import { docToAskPages, type Doc, type DocPage } from "./document/model";
 import { DocumentSession, type PageReadCallbacks, type PreparedPdf } from "./document/session";
@@ -138,6 +139,8 @@ export class AppController {
   private pausedByHide = false;
   private cameraIntroPending: "full" | "addPage" | "retake" | "none" = "full";
   private readonly sampler = new FrameSampler();
+  /** A separate canvas for judging the frames of a burst, so the analysis canvas keeps its size. */
+  private readonly burstSampler = new FrameSampler();
   private tracker = new FramingTracker();
   private readonly cuePolicy = new CuePolicy();
   private analysisTimer: unknown = null;
@@ -534,7 +537,7 @@ export class AppController {
     this.ui.update({ capturing: true });
     this.sounds.shutter();
     try {
-      const still = await camera.captureStill();
+      const still = await camera.captureStill(this.burstOptions());
       const sample = this.sampler.sample(still.source, still.width, still.height);
       if (sample && !this.tracker.isStillSharp(sample)) {
         if (typeof ImageBitmap !== "undefined" && still.source instanceof ImageBitmap) still.source.close();
@@ -565,6 +568,18 @@ export class AppController {
     else if (intro === "retake") this.say(`Page ${page} again. Lay the phone flat on the page, then lift it slowly.`);
   }
 
+  /** Without a full-sensor photo, the sharpest of four video frames taken 90 ms apart. */
+  private burstOptions(): { burst: number; intervalMs: number; score: (frame: HTMLCanvasElement) => number } {
+    return {
+      burst: 4,
+      intervalMs: 90,
+      score: (frame) => {
+        const sample = this.burstSampler.sampleCenter(frame, frame.width, frame.height);
+        return sample ? laplacianVariance(toLuma(sample)) : 0;
+      },
+    };
+  }
+
   /** The Capture button: takes the picture at once, with no framing checks (principle 4). */
   async captureManual(): Promise<void> {
     if (this.ui.get().capturing) return;
@@ -580,7 +595,7 @@ export class AppController {
     }
     this.sounds.shutter();
     try {
-      const still = await camera.captureStill();
+      const still = await camera.captureStill(this.burstOptions());
       await this.processCapture(still.source, still.width, still.height);
     } catch (err) {
       this.ui.update({ capturing: false });
@@ -609,7 +624,7 @@ export class AppController {
   private async processCapture(source: CanvasImageSource, width: number, height: number): Promise<void> {
     const image = await prepareImage(source, width, height);
     if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) source.close();
-    console.info("captured", { width: image.width, height: image.height, bytes: image.bytes });
+    console.info("captured", { width: image.width, height: image.height, bytes: image.bytes, enhanced: image.enhanced });
     this.say("Got it. Reading.");
     this.ui.update({ capturing: false });
     this.startPageRead({ image });

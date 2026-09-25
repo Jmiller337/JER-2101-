@@ -129,6 +129,14 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] A full page of small print: the reading goes all the way to the last line, including footers and reference numbers.
 - [ ] Something that is not a document (a hand, the table): it asks you to try again and says why.
 
+## 7b. Hard conditions and filled-in words
+
+- [ ] A letter in a dim room with the flashlight off: the app reads it. Note any facts (amounts, dates, names) it got wrong: ______
+- [ ] A crumpled or folded letter: the app reads across the folds. Small words may be filled in, but no amount, date, or name is made up.
+- [ ] A faded shop receipt: the prices are read, or said with "possibly" or "unclear word" when they cannot be made out.
+- [ ] Cover part of a number with a finger: the app says "unclear word" or "possibly" for it, never a different number.
+- [ ] Ask a question whose answer was hard to read: the answer says it was hard to read.
+
 ## 7a. Errors
 
 - [ ] Turn on Airplane Mode and press Capture. After a short automatic retry the app says "I couldn't reach the reading service. Check your connection, then press Capture to try again." and the camera comes back. Turn Airplane Mode off and capture again.
