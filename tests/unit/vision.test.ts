@@ -10,7 +10,6 @@ import {
   type Quad,
 } from "@/lib/client/vision/analysis";
 import { CuePolicy, cueFor, directionCue, FRAMING, FramingTracker, type Situation } from "@/lib/client/vision/framing";
-import { alignQuad, approachQuad, containRect, coverRect, normalizeQuad, placeQuad } from "@/lib/client/vision/outline";
 import { blurFrame, makeFrame } from "../helpers/frames";
 
 const CENTERED = { x0: 0.2, y0: 0.1, x1: 0.8, y1: 0.9 };
@@ -128,45 +127,6 @@ describe("page corners", () => {
       { x: box.x1 + 1, y: box.y1 + 1 },
       { x: box.x0, y: box.y1 + 1 },
     ]);
-  });
-});
-
-describe("drawing the box", () => {
-  const square: Quad = [
-    { x: 0.25, y: 0.25 },
-    { x: 0.75, y: 0.25 },
-    { x: 0.75, y: 0.75 },
-    { x: 0.25, y: 0.75 },
-  ];
-
-  it("places the page where the picture is shown, whole or filling the screen", () => {
-    // A landscape picture in a portrait box: bars above and below.
-    expect(containRect(480, 360, 390, 600)).toEqual({ x: 0, y: 153.75, width: 390, height: 292.5 });
-    // A portrait picture in a wider box: bars at the sides.
-    expect(containRect(1080, 1920, 390, 600)).toEqual({ x: 26.25, y: 0, width: 337.5, height: 600 });
-    expect(containRect(0, 0, 390, 600)).toBeNull();
-    // Filling the screen (the camera): the picture overflows and is cropped at the sides.
-    expect(coverRect(480, 360, 390, 600)).toEqual({ x: -205, y: 0, width: 800, height: 600 });
-    expect(coverRect(1080, 1920, 390, 844)).toEqual({ x: -42.375, y: 0, width: 474.75, height: 844 });
-    const placed = placeQuad(normalizeQuad([{ x: 40, y: 30 }, { x: 120, y: 30 }, { x: 120, y: 90 }, { x: 40, y: 90 }], 160, 120), {
-      x: 10,
-      y: 20,
-      width: 320,
-      height: 240,
-    });
-    expect(placed[0]).toEqual({ x: 90, y: 80 });
-    expect(placed[2]).toEqual({ x: 250, y: 200 });
-  });
-
-  it("glides toward the new corners without spinning when they are named from another corner", () => {
-    const renamed: Quad = [square[2], square[3], square[0], square[1]];
-    expect(alignQuad(square, renamed)).toEqual(square);
-    const moved = square.map((p) => ({ x: p.x + 0.1, y: p.y })) as Quad;
-    const halfway = approachQuad(square, [moved[1], moved[2], moved[3], moved[0]], 0.5);
-    halfway.forEach((p, k) => {
-      expect(p.x).toBeCloseTo(square[k]!.x + 0.05);
-      expect(p.y).toBeCloseTo(square[k]!.y);
-    });
   });
 });
 

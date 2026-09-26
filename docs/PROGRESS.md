@@ -182,6 +182,10 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 - **The camera picture fills the whole screen**, by the owner's request, with the controls floating on glass over it; the page box follows the crop.
 - **Not verified on a real iPhone:** that real text at the camera's small analysis size still counts as writing (faint print, small print far away), and that real surfaces (wood, stone, cloth) do not.
 
+## No box on the camera
+
+- **The box around the page is gone**, at the owner's request. The picture now shows nothing drawn over it. Automatic capture is unchanged: it still needs a page with writing on it and a changed view, and the cues are still spoken. The detector still finds the page's corners, because the writing is measured inside them. The box's drawing code, styles, and tests were removed with it; the tilted-page test now checks only that the page is taken.
+
 ## What still needs the owner
 
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).

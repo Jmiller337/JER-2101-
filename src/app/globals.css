@@ -349,35 +349,6 @@ body {
 }
 
 /*
- * The box around the page on the camera screen, over the live picture in every theme: white
- * while the page is being lined up, green when the picture is taken. A dark halo keeps the line
- * visible on white paper as well as on a dark table.
- */
-.page-outline .page-outline-halo {
-  fill: none;
-  stroke: rgb(0 0 0 / 0.55);
-  stroke-width: 11px;
-  stroke-linejoin: round;
-}
-.page-outline .page-outline-line {
-  fill: rgb(255 255 255 / 0.08);
-  stroke: #ffffff;
-  stroke-width: 5px;
-  stroke-linejoin: round;
-  transition:
-    stroke 150ms ease,
-    fill 150ms ease;
-}
-.page-outline[data-state="ready"] .page-outline-line {
-  fill: rgb(48 209 88 / 0.25);
-  stroke: #30d158;
-  stroke-width: 7px;
-}
-.page-outline[data-state="hidden"] {
-  visibility: hidden;
-}
-
-/*
  * Focus rings only for keyboard users: the start-up script in layout.tsx sets data-keyboard on
  * <html> after a key press and removes it on a tap. Headings the app focuses for VoiceOver
  * (tabindex="-1") never get a ring.

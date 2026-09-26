@@ -4,15 +4,14 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { CAMERA_MODE_NAMES, CAMERA_MODES, SwipeTracker, type CameraMode } from "@/lib/client/cameraModes";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { BackIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
-import { PageOutline } from "../PageOutline";
 import { Button, MoreButton } from "../ui";
 
 /**
  * Screen 1, the home screen, built like the iPhone's Camera: the picture fills the whole screen,
  * and three modes sit in a glass capsule above one large action area: PDF, Camera, and Photos.
  * Swipe left or right anywhere on the screen, or tap a mode, to move between them; the app says
- * each mode's name. In Camera mode a box is drawn around a page with writing on it; the preview
- * is hidden from VoiceOver, since every change is spoken. VoiceOver takes sideways swipes for
+ * each mode's name. The preview is hidden from VoiceOver: there is nothing useful to describe,
+ * and every change is spoken. VoiceOver takes sideways swipes for
  * itself, so its users switch modes with the tabs.
  */
 export function CameraScreen() {
@@ -100,8 +99,8 @@ export function CameraScreen() {
         }
       }}
     >
-      {/* The picture fills the whole screen, as in the iPhone's Camera, with the box around the
-          page drawn on it and the controls floating over it. */}
+      {/* The picture fills the whole screen, as in the iPhone's Camera, with the controls
+          floating over it. */}
       <video
         ref={videoRef}
         aria-hidden="true"
@@ -111,7 +110,6 @@ export function CameraScreen() {
         autoPlay
         className={`absolute inset-0 h-full w-full object-cover ${mode === "camera" ? "" : "invisible"}`}
       />
-      <PageOutline videoRef={videoRef} />
       {mode !== "camera" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-8 pb-[34dvh] text-center" data-testid="mode-intro">
           {mode === "pdf" ? <PdfIcon className="h-24 w-24" /> : <PhotoIcon className="h-24 w-24" />}

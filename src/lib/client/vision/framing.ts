@@ -114,8 +114,6 @@ export class FramingTracker {
   calmMs: number = FRAMING.calmMs;
   /** The view at the last picture: no automatic capture until the view has changed from it. */
   private changeRef: Luma | null = null;
-  /** Whether the last frame showed a page with writing on it. */
-  lastIsDocument = false;
 
   /** Holds automatic capture until the view differs from this frame (the page just read). */
   requireChangeFrom(luma: Luma | null): void {
@@ -137,7 +135,6 @@ export class FramingTracker {
 
     const page = analysis.page;
     const document = page.found && isDocument(analysis);
-    this.lastIsDocument = document;
     // Only a page with writing counts as calm: a steady view of anything else never fires.
     if (page.box && document) {
       if (!this.calmRef || boxShift(this.calmRef.box, page.box) > FRAMING.calmShift) this.calmRef = { box: page.box, since: now };

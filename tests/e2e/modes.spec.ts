@@ -75,7 +75,6 @@ test("tapping a mode switches to it; automatic capture waits for Camera mode", a
   await page.getByRole("tab", { name: "PDF" }).click();
   await expectSpoken(page, PDF_LINE);
   await expect(page.getByTestId("mode-intro")).toContainText("Read a PDF");
-  await expect(page.getByTestId("page-outline")).toHaveAttribute("data-state", "hidden");
   // The page is in view the whole time, but nothing is captured outside Camera mode.
   await page.waitForTimeout(3000);
   expect(await utterances(page)).not.toContain("Got it. Reading.");

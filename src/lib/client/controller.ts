@@ -33,7 +33,6 @@ import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
 import { FRAMING, CuePolicy, FramingTracker, type Situation } from "./vision/framing";
 import { CAMERA_MODE_LINES, MODES_HINT, modeAfterSwipe, type CameraMode, type SwipeDirection } from "./cameraModes";
-import { NO_OUTLINE, normalizeQuad, type PageOutline } from "./vision/outline";
 import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
@@ -89,8 +88,7 @@ export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
 export const CAMERA_PERMISSION_LINE = "I need the camera to see the page. Tap Allow if your phone asks.";
 export const CAMERA_INTRO = "Camera ready.";
-/** How long the box around the page stays after the page is lost. */
-const OUTLINE_HOLD_MS = 400;
+
 
 export interface ControllerEnv {
   port: SpeechPort;
@@ -133,8 +131,6 @@ export class AppController {
   /** Voices the phone offers (they load asynchronously on iOS). */
   readonly voices: Store<VoiceInfo[]>;
   readonly ask: Store<AskState>;
-  /** The box drawn around the page on the camera screen. */
-  readonly outline = new Store<PageOutline>(NO_OUTLINE);
 
   private readonly env: ControllerEnv;
   private passcode: string | null;
@@ -151,8 +147,6 @@ export class AppController {
   private tracker = new FramingTracker();
   private readonly cuePolicy = new CuePolicy();
   private analysisTimer: unknown = null;
-  /** When the page was last seen, so the box survives a frame or two without it. */
-  private outlineSeenAt = -Infinity;
   /** The camera's view when the last picture was taken: the same view is not taken again. */
   private lastCaptureView: Luma | null = null;
   /** Automatic capture fires at most once per visit to the camera screen (PROMPT.md 6.3). */
@@ -450,7 +444,6 @@ export class AppController {
     this.videoToken += 1;
     this.videoEl = null;
     this.stopGuidance();
-    this.outline.set(NO_OUTLINE);
     this.resolveCameraWaiters(null);
     if (this.camera) {
       void this.camera.setTorch(false);
@@ -473,7 +466,6 @@ export class AppController {
     // is often still in view: wait for the view to change. A retake means the same page again.
     this.tracker.requireChangeFrom(this.retakeTarget === null ? this.lastCaptureView : null);
     this.cuePolicy.reset();
-    this.outline.set(NO_OUTLINE);
     this.armed = true;
     this.torchTried = false;
     this.scheduleAnalysis(250);
@@ -517,7 +509,6 @@ export class AppController {
     if (frame) {
       const now = this.now();
       const situation = this.tracker.update(frame, now);
-      this.showOutline(situation, now);
       if (situation.kind === "ready" && this.armed && this.settings.get().autoCapture) {
         void this.autoCapture();
         return;
@@ -525,22 +516,6 @@ export class AppController {
       this.guide(situation, now);
     }
     this.scheduleAnalysis();
-  }
-
-  /**
-   * The box around the page: white while the page is being lined up, green when it is ready and
-   * the picture is taken. A page lost for a frame or two keeps its box, so it does not flicker.
-   */
-  private showOutline(situation: Situation, now: number): void {
-    const analysis = this.tracker.lastAnalysis;
-    // The box means "I see a page with writing": nothing is outlined around a wall or a table.
-    const quad = this.tracker.lastIsDocument ? analysis?.page.quad : null;
-    if (analysis && quad) {
-      this.outlineSeenAt = now;
-      this.outline.set({ quad: normalizeQuad(quad, analysis.luma.width, analysis.luma.height), ready: situation.kind === "ready" });
-    } else if (now - this.outlineSeenAt > OUTLINE_HOLD_MS && this.outline.get().quad) {
-      this.outline.set(NO_OUTLINE);
-    }
   }
 
   private guide(situation: Situation, now: number): void {
@@ -582,7 +557,6 @@ export class AppController {
 
   private retryAutoCapture(message: string): void {
     this.ui.update({ capturing: false });
-    this.outline.update({ ready: false });
     this.tracker.resetSteady();
     this.armed = true;
     this.say(message);
@@ -617,8 +591,7 @@ export class AppController {
         if (this.camera) this.startGuidance();
       } else {
         this.stopGuidance();
-        this.outline.set(NO_OUTLINE);
-        if (this.camera) void this.camera.setTorch(false);
+            if (this.camera) void this.camera.setTorch(false);
       }
     }
     // VoiceOver reads the selected tab itself.
