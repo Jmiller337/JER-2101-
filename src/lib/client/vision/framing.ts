@@ -3,6 +3,7 @@ import {
   boxShift,
   centerBox,
   countEdges,
+  frameDifference,
   laplacianVariance,
   toLuma,
   type Box,
@@ -15,6 +16,10 @@ import {
 export type Situation =
   | { kind: "dark" }
   | { kind: "noPage" }
+  /** Something page-like is in view but shows no writing: a blank sheet, a wall, a window. */
+  | { kind: "noText" }
+  /** The page is ready, but nothing has changed since the last picture: it was just read. */
+  | { kind: "samePage" }
   | { kind: "tooBig" }
   | { kind: "tooSmall" }
   | { kind: "cutOff"; edges: Edges }
@@ -51,11 +56,23 @@ export const FRAMING = {
    * reliable than these heuristics on a real phone.
    */
   calmShift: 3,
-  calmMs: 1500,
+  calmMs: 2000,
   /** The calm capture still needs this much light on the page (dim photos are brightened). */
   calmDarkPageMean: 55,
   /** ...and a page covering at least this fraction of the frame. */
   calmMinCoverage: 0.05,
+  /**
+   * Automatic capture needs writing on the page, so it never photographs a table, a wall, a
+   * window, or a blank sheet (see `writing` in analysis.ts): some ink (not a blank sheet), not
+   * mostly ink (not a keyboard or a dark pattern), some smooth paper (not a carpet or stone),
+   * and paper that is not too dark. Pressing Capture always works regardless.
+   */
+  inkMin: 0.015,
+  inkMax: 0.5,
+  smoothMin: 0.12,
+  paperMin: 60,
+  /** After a picture, the view must change by this much before another automatic one. */
+  changeDiff: 12,
   /** Below this fraction of the frame the page is too far away. A fully visible letter-sized
    * page covers about 40 to 55 percent of a portrait frame, so this is deliberately low. */
   tooSmallCoverage: 0.2,
@@ -67,6 +84,17 @@ export const FRAMING = {
   /** A still is blurry when its center sharpness is below this fraction of the preview's best. */
   stillSharpRelative: 0.35,
 } as const;
+
+/** A page with writing on it: some ink, not mostly ink, some smooth paper, and light enough. */
+export function isDocument(analysis: FrameAnalysis): boolean {
+  return (
+    analysis.page.found &&
+    analysis.ink >= FRAMING.inkMin &&
+    analysis.ink <= FRAMING.inkMax &&
+    analysis.smooth >= FRAMING.smoothMin &&
+    analysis.paper >= FRAMING.paperMin
+  );
+}
 
 /**
  * Tracks frames over time: steadiness (how long the picture has not moved) and a sharpness
@@ -84,6 +112,15 @@ export class FramingTracker {
   lastAnalysis: FrameAnalysis | null = null;
   /** How long the phone must be calm over a page before a lenient capture; Infinity turns it off. */
   calmMs: number = FRAMING.calmMs;
+  /** The view at the last picture: no automatic capture until the view has changed from it. */
+  private changeRef: Luma | null = null;
+  /** Whether the last frame showed a page with writing on it. */
+  lastIsDocument = false;
+
+  /** Holds automatic capture until the view differs from this frame (the page just read). */
+  requireChangeFrom(luma: Luma | null): void {
+    this.changeRef = luma;
+  }
 
   update(frame: PixelFrame, now: number): Situation {
     const analysis = analyzeFrame(frame, this.previous);
@@ -99,37 +136,44 @@ export class FramingTracker {
     else this.steadySince ??= now;
 
     const page = analysis.page;
-    if (page.box) {
+    const document = page.found && isDocument(analysis);
+    this.lastIsDocument = document;
+    // Only a page with writing counts as calm: a steady view of anything else never fires.
+    if (page.box && document) {
       if (!this.calmRef || boxShift(this.calmRef.box, page.box) > FRAMING.calmShift) this.calmRef = { box: page.box, since: now };
     } else {
       this.calmRef = null;
     }
+    // Until the view changes, the page just read is not taken again.
+    if (this.changeRef && frameDifference(analysis.luma, this.changeRef) > FRAMING.changeDiff) this.changeRef = null;
+    const ready = (lenient: boolean): Situation => (this.changeRef ? { kind: "samePage" } : { kind: "ready", lenient });
     const calibrated = this.frames >= FRAMING.calibrationFrames;
     const calm = this.calmRef !== null && now - this.calmRef.since >= this.calmMs;
     if (
-      page.found &&
+      document &&
       calm &&
       calibrated &&
       analysis.pageMean >= FRAMING.calmDarkPageMean &&
       page.coverage >= FRAMING.calmMinCoverage
     ) {
-      return { kind: "ready", lenient: true };
+      return ready(true);
     }
 
     const dark = page.found ? analysis.pageMean < FRAMING.darkPageMean : analysis.frameMean < FRAMING.darkFrameMean;
     if (dark) return { kind: "dark" };
     if (!page.found) return { kind: "noPage" };
+    if (page.coverage < FRAMING.tooSmallCoverage) return { kind: "tooSmall" };
+    if (!document) return { kind: "noText" };
     const t = page.touches;
     const touching = countEdges(t);
     if (touching >= 3 || (t.left && t.right) || (t.top && t.bottom)) return { kind: "tooBig" };
     if (touching > 0) return { kind: "cutOff", edges: t };
-    if (page.coverage < FRAMING.tooSmallCoverage) return { kind: "tooSmall" };
     if (analysis.glare > FRAMING.glare) return { kind: "glare" };
     if (moving) return { kind: "moving" };
     if (this.steadySince === null || now - this.steadySince < FRAMING.steadyMs) return { kind: "settling" };
     if (!calibrated) return { kind: "settling" };
     const sharp = analysis.sharpness >= FRAMING.sharpFloor && analysis.sharpness >= this.sharpMax * FRAMING.sharpRelative;
-    return sharp ? { kind: "ready", lenient: false } : { kind: "blurry" };
+    return sharp ? ready(false) : { kind: "blurry" };
   }
 
   /** After a capture that did not work out: require a fresh steady period before firing again. */
@@ -160,6 +204,10 @@ export function cueFor(situation: Situation, autoCapture: boolean): string | nul
       return "Too dark. Turn on a light.";
     case "noPage":
       return "I can't see a page.";
+    case "noText":
+      return "I can't see any writing.";
+    case "samePage":
+      return "This is the page you just read.";
     case "tooBig":
       return "Lift the phone higher.";
     case "tooSmall":

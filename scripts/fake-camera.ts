@@ -34,6 +34,8 @@ export interface VideoSpec {
   keyframes: Keyframe[];
   /** Overall brightness multiplier (0.2 for a dark room). */
   light?: number;
+  /** A page with nothing written on it. */
+  blank?: boolean;
 }
 
 function seededRandom(seed: number): () => number {
@@ -106,7 +108,7 @@ export function writeY4m(file: string, spec: VideoSpec): void {
           // Text lines: rows of dark bars inside 10% margins, every ~6% of the page height.
           const px = (pc - x0) / pageW;
           const py = (pr - y0) / pageH;
-          if (px > 0.1 && px < 0.9 && py > 0.1 && py < 0.9) {
+          if (!spec.blank && px > 0.1 && px < 0.9 && py > 0.1 && py < 0.9) {
             const line = (py - 0.1) / 0.06;
             const inLine = line - Math.floor(line) < 0.35;
             const lineIndex = Math.floor(line);
@@ -150,6 +152,8 @@ export const VIDEOS: Record<string, VideoSpec> = {
       { at: 6.5, page: CENTERED, jitter: 0 },
     ],
   },
+  // A blank sheet held steady: something page-shaped with no writing, never to be photographed.
+  "blank-page": { width: 480, height: 360, fps: 10, seconds: 4, keyframes: [{ at: 0, page: CENTERED }], blank: true },
   // A dark room.
   "dark-room": { width: 480, height: 360, fps: 10, seconds: 3, keyframes: [{ at: 0, page: CENTERED }], light: 0.2 },
   // A portrait picture of a page turned 12 degrees and running off the bottom, with a slight

@@ -8,12 +8,12 @@ import { PageOutline } from "../PageOutline";
 import { Button, MoreButton } from "../ui";
 
 /**
- * Screen 1, the home screen, built like the iPhone's Camera. Three modes sit in a strip above
- * one large action panel: PDF, Camera, and Photos. Swipe left or right anywhere on the screen,
- * or tap a mode, to move between them; the app says each mode's name. In Camera mode the live
- * picture shows a box around the page it sees; the preview is hidden from VoiceOver, since every
- * change is spoken. VoiceOver takes sideways swipes for itself, so its users switch modes with
- * the tabs.
+ * Screen 1, the home screen, built like the iPhone's Camera: the picture fills the whole screen,
+ * and three modes sit in a glass capsule above one large action area: PDF, Camera, and Photos.
+ * Swipe left or right anywhere on the screen, or tap a mode, to move between them; the app says
+ * each mode's name. In Camera mode a box is drawn around a page with writing on it; the preview
+ * is hidden from VoiceOver, since every change is spoken. VoiceOver takes sideways swipes for
+ * itself, so its users switch modes with the tabs.
  */
 export function CameraScreen() {
   const controller = useController();
@@ -82,7 +82,7 @@ export function CameraScreen() {
 
   return (
     <main
-      className="flex h-dvh touch-pan-y touch-pinch-zoom select-none flex-col overflow-hidden bg-black text-on-scrim"
+      className="relative h-dvh touch-pan-y touch-pinch-zoom overflow-hidden bg-black text-on-scrim select-none"
       onPointerDown={(event) => {
         if (event.isPrimary) swipe.down(event.clientX, event.clientY, event.timeStamp, event.pointerId);
       }}
@@ -100,68 +100,105 @@ export function CameraScreen() {
         }
       }}
     >
-      {/* The picture, shown whole so it is exactly what the photo will hold, with the box
-          around the page and the floating controls over it. */}
-      <div className="relative min-h-0 flex-1">
-        <video
-          ref={videoRef}
-          aria-hidden="true"
-          tabIndex={-1}
-          muted
-          playsInline
-          autoPlay
-          className={`absolute inset-0 h-full w-full object-contain ${mode === "camera" ? "" : "invisible"}`}
-        />
-        <PageOutline videoRef={videoRef} />
-        {mode !== "camera" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-8 text-center" data-testid="mode-intro">
-            {mode === "pdf" ? <PdfIcon className="h-24 w-24" /> : <PhotoIcon className="h-24 w-24" />}
-            <p className="max-w-xs text-2xl font-semibold leading-snug">
-              {mode === "pdf" ? "Read a PDF from Files, Mail, or iCloud Drive." : "Read a photo or a screenshot from your library."}
-            </p>
-          </div>
-        )}
-        <div className="relative z-10 flex h-full flex-col">
-          <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-            {/* The screen's name for VoiceOver; sighted users see the picture itself. */}
-            <h1 ref={headingRef} tabIndex={-1} className="sr-only">
-              {ui.cameraTitle}
-            </h1>
-            {docInProgress ? (
-              <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" onClick={() => controller.backToReading()} />
-            ) : (
-              <span />
-            )}
-            <div className="flex flex-col items-end gap-2">
-              <MoreButton
-                expanded={more}
-                onToggle={() => setMore((open) => !open)}
-                controls="more-camera-options"
-                icon={<MoreIcon />}
-                variant="glass"
-              />
-              <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
-                {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
-                <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
-              </div>
+      {/* The picture fills the whole screen, as in the iPhone's Camera, with the box around the
+          page drawn on it and the controls floating over it. */}
+      <video
+        ref={videoRef}
+        aria-hidden="true"
+        tabIndex={-1}
+        muted
+        playsInline
+        autoPlay
+        className={`absolute inset-0 h-full w-full object-cover ${mode === "camera" ? "" : "invisible"}`}
+      />
+      <PageOutline videoRef={videoRef} />
+      {mode !== "camera" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-8 pb-[34dvh] text-center" data-testid="mode-intro">
+          {mode === "pdf" ? <PdfIcon className="h-24 w-24" /> : <PhotoIcon className="h-24 w-24" />}
+          <p className="max-w-xs text-2xl font-semibold leading-snug">
+            {mode === "pdf" ? "Read a PDF from Files, Mail, or iCloud Drive." : "Read a photo or a screenshot from your library."}
+          </p>
+        </div>
+      )}
+
+      <div className="relative z-10 flex h-full flex-col">
+        <div className="flex shrink-0 items-start justify-between gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+          {/* The screen's name for VoiceOver; sighted users see the picture itself. */}
+          <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+            {ui.cameraTitle}
+          </h1>
+          {docInProgress ? (
+            <Button label="Back to reading" icon={<BackIcon />} variant="glass" size="normal" onClick={() => controller.backToReading()} />
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-col items-end gap-2">
+            <MoreButton
+              expanded={more}
+              onToggle={() => setMore((open) => !open)}
+              controls="more-camera-options"
+              icon={<MoreIcon />}
+              variant="glass"
+            />
+            <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
+              {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
+              <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
             </div>
           </div>
+        </div>
 
-          <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
-            {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
-            {mode === "camera" && status && (
-              <p
-                className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
-                data-testid="camera-status"
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
+          {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
+          {mode === "camera" && status && (
+            <p
+              className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
+              data-testid="camera-status"
+            >
+              {status}
+            </p>
+          )}
+          {ui.errorText && (
+            <p ref={errorRef} tabIndex={-1} className="glass-dark max-w-full rounded-3xl px-5 py-2 text-center text-xl font-semibold text-highlight">
+              {ui.errorText}
+            </p>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-col items-center pb-[env(safe-area-inset-bottom)]">
+          {/* The modes, like Photo, Video, and Slo-mo on the iPhone's Camera, in a glass capsule. */}
+          <div role="tablist" aria-label="Modes" className="glass-dark flex gap-1 rounded-full p-1" onKeyDown={onTabKey}>
+            <span ref={lensRef} aria-hidden="true" className="glass-lens pointer-events-none absolute top-1 bottom-1 left-0 w-0 rounded-full" />
+            {CAMERA_MODES.map((m) => (
+              <button
+                key={m}
+                id={`mode-${m}`}
+                type="button"
+                role="tab"
+                aria-selected={m === mode}
+                aria-controls="camera-mode-panel"
+                tabIndex={m === mode ? 0 : -1}
+                onClick={() => chooseMode(m)}
+                className={`relative min-h-12 min-w-24 rounded-full px-4 text-xl font-bold tracking-wide uppercase ${
+                  m === mode ? "text-mode-selected" : "text-mode-idle"
+                }`}
               >
-                {status}
-              </p>
-            )}
-            {ui.errorText && (
-              <p ref={errorRef} tabIndex={-1} className="glass-dark max-w-full rounded-3xl px-5 py-2 text-center text-xl font-semibold text-highlight">
-                {ui.errorText}
-              </p>
-            )}
+                {CAMERA_MODE_NAMES[m]}
+              </button>
+            ))}
+          </div>
+
+          {/* The one primary action: a large clear area over the bottom of the picture, easy to
+              find by touch, with the shutter and its label on glass. */}
+          <div role="tabpanel" id="camera-mode-panel" aria-labelledby={`mode-${mode}`} className="w-full p-2">
+            <button
+              type="button"
+              onClick={onAction}
+              aria-disabled={ui.capturing}
+              className="group flex h-[24dvh] min-h-28 w-full flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-button-border text-on-scrim"
+            >
+              {action.icon}
+              <span className="glass-dark rounded-full px-6 py-1.5 text-3xl font-bold tracking-tight">{action.label}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -172,43 +209,6 @@ export function CameraScreen() {
       <FileInput inputRef={fileRef} accept="image/*" capture testId="phone-camera-input" onFile={(file) => void controller.captureFromFile(file)} />
       <FileInput inputRef={photoRef} accept="image/*" testId="photo-input" onFile={(file) => void controller.captureFromFile(file)} />
       <FileInput inputRef={pdfRef} accept="application/pdf,.pdf" testId="pdf-input" onFile={(file) => void controller.openPdf(file)} />
-
-      <div className="flex shrink-0 flex-col items-center bg-black pb-[env(safe-area-inset-bottom)]">
-        {/* The modes, like Photo, Video, and Slo-mo on the iPhone's Camera, in a glass capsule. */}
-        <div role="tablist" aria-label="Modes" className="glass-dark mt-3 flex gap-1 rounded-full p-1" onKeyDown={onTabKey}>
-          <span ref={lensRef} aria-hidden="true" className="glass-lens pointer-events-none absolute top-1 bottom-1 left-0 w-0 rounded-full" />
-          {CAMERA_MODES.map((m) => (
-            <button
-              key={m}
-              id={`mode-${m}`}
-              type="button"
-              role="tab"
-              aria-selected={m === mode}
-              aria-controls="camera-mode-panel"
-              tabIndex={m === mode ? 0 : -1}
-              onClick={() => chooseMode(m)}
-              className={`relative min-h-12 min-w-24 rounded-full px-4 text-xl font-bold tracking-wide uppercase ${
-                m === mode ? "text-mode-selected" : "text-mode-idle"
-              }`}
-            >
-              {CAMERA_MODE_NAMES[m]}
-            </button>
-          ))}
-        </div>
-
-        {/* The one primary action: the rest of the panel is the button. */}
-        <div role="tabpanel" id="camera-mode-panel" aria-labelledby={`mode-${mode}`} className="w-full p-2">
-          <button
-            type="button"
-            onClick={onAction}
-            aria-disabled={ui.capturing}
-            className="group flex h-[24dvh] min-h-28 w-full flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-button-border text-on-scrim"
-          >
-            {action.icon}
-            <span className="text-3xl font-bold tracking-tight">{action.label}</span>
-          </button>
-        </div>
-      </div>
     </main>
   );
 }
@@ -220,7 +220,10 @@ function actionFor(mode: CameraMode, cameraFailed: boolean, capturing: boolean):
   if (cameraFailed) return { icon: <PhotoIcon className="h-14 w-14" />, label: capturing ? "Reading the photo…" : "Use phone camera instead" };
   return {
     icon: (
-      <span aria-hidden="true" className={`block h-20 w-20 rounded-full border-4 border-white p-1.5 ${capturing ? "opacity-50" : ""}`}>
+      <span
+        aria-hidden="true"
+        className={`block h-20 w-20 rounded-full border-4 border-white p-1.5 shadow-[0_0_0_2px_rgb(0_0_0/0.35),0_4px_16px_rgb(0_0_0/0.35)] ${capturing ? "opacity-50" : ""}`}
+      >
         <span className="block h-full w-full rounded-full bg-white transition-transform duration-150 group-active:scale-90" />
       </span>
     ),

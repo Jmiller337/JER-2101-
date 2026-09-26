@@ -37,7 +37,10 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] Hold the phone too close (the page overflowing the screen) but still for about a second and a half: the app takes the picture anyway, and either reads the page or says what to change. Note roughly how long it waited: ______ seconds.
 - [ ] A white box is drawn around the page on the screen and follows it as the phone moves. Turn the page at an angle: the box turns with it and its corners sit on the page's corners. **If the box sits off the page, note by how much and in which direction.**
 - [ ] When the picture is taken the box turns green, then the app says "Got it. Reading."
-- [ ] Hard framings: the page at an angle, the page cut off at one edge, the page small in the picture, a dim room with one lamp. In each, holding the phone still for a second or two takes the picture. Note any case where it never does: ______
+- [ ] Hard framings: the page at an angle, the page cut off at one edge, the page small in the picture, a dim room with one lamp. In each, holding the phone still for about two seconds takes the picture. Note any case where it never does: ______
+- [ ] No random pictures: point the camera for ten seconds each at an empty table, the floor, a white wall, a window, a keyboard, and a blank sheet of paper. No picture is taken; for the wall and the blank sheet the app says "I can't see any writing." Note anything it photographed anyway: ______
+- [ ] After a page has been read, press New document and keep the same page in view: the app says "This is the page you just read." and takes no picture. Put a different page down: it is taken.
+- [ ] The camera picture fills the whole screen, and the modes, the shutter, and Capture float over it.
 - [ ] Hold the phone still over a page in the ordinary way for five seconds without pressing anything: the picture is taken. If it is not, note what the app said instead.
 - [ ] Cues are never faster than about one every one and a half seconds, and the same cue is not repeated within four seconds.
 - [ ] In a dark room: "Too dark. Turn on a light." (or, on a phone whose browser allows the flashlight, "It's dark, so I turned on the light." and the flashlight comes on).

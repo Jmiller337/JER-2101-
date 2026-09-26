@@ -26,6 +26,18 @@ export function containRect(pictureWidth: number, pictureHeight: number, boxWidt
   return { x: (boxWidth - width) / 2, y: (boxHeight - height) / 2, width, height };
 }
 
+/**
+ * Where a picture appears inside a box when it fills the box and the overflow is cropped (CSS
+ * object-fit: cover). The rectangle can start outside the box.
+ */
+export function coverRect(pictureWidth: number, pictureHeight: number, boxWidth: number, boxHeight: number): Rect | null {
+  if (!pictureWidth || !pictureHeight || !boxWidth || !boxHeight) return null;
+  const scale = Math.max(boxWidth / pictureWidth, boxHeight / pictureHeight);
+  const width = pictureWidth * scale;
+  const height = pictureHeight * scale;
+  return { x: (boxWidth - width) / 2, y: (boxHeight - height) / 2, width, height };
+}
+
 function mapQuad(quad: Quad, map: (p: Point) => Point): Quad {
   return [map(quad[0]), map(quad[1]), map(quad[2]), map(quad[3])];
 }

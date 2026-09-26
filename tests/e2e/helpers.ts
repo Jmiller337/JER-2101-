@@ -182,12 +182,13 @@ export function outlineStates(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as { __outlineStates: string[] }).__outlineStates);
 }
 
-/** The box's corners on screen, and where the picture is shown. */
+/** The box's corners on screen, and where the whole picture lies (partly off screen). */
 export function outlineGeometry(page: Page) {
   return page.evaluate(() => {
     const video = document.querySelector("video")!;
     const box = video.getBoundingClientRect();
-    const scale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight);
+    // The picture fills the screen and its overflow is cropped (object-fit: cover).
+    const scale = Math.max(box.width / video.videoWidth, box.height / video.videoHeight);
     const width = video.videoWidth * scale;
     const height = video.videoHeight * scale;
     const svg = document.querySelector('[data-testid="page-outline"]')!.getBoundingClientRect();

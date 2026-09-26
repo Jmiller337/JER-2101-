@@ -1,10 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { analyzeFrame, findPage, frameDifference, laplacianVariance, toLuma, type Quad } from "@/lib/client/vision/analysis";
-import { CuePolicy, cueFor, directionCue, FramingTracker, type Situation } from "@/lib/client/vision/framing";
-import { alignQuad, approachQuad, containRect, normalizeQuad, placeQuad } from "@/lib/client/vision/outline";
+import {
+  analyzeFrame,
+  findPage,
+  frameDifference,
+  laplacianVariance,
+  toLuma,
+  writing,
+  type PixelFrame,
+  type Quad,
+} from "@/lib/client/vision/analysis";
+import { CuePolicy, cueFor, directionCue, FRAMING, FramingTracker, type Situation } from "@/lib/client/vision/framing";
+import { alignQuad, approachQuad, containRect, coverRect, normalizeQuad, placeQuad } from "@/lib/client/vision/outline";
 import { blurFrame, makeFrame } from "../helpers/frames";
 
 const CENTERED = { x0: 0.2, y0: 0.1, x1: 0.8, y1: 0.9 };
+
+/** A random pattern of square blocks between two brightness levels, filling the frame. */
+function blocks(seed: number, lo: number, hi: number, size: number): PixelFrame {
+  const width = 160;
+  const height = 120;
+  const data = new Uint8ClampedArray(width * height * 4);
+  let s = seed * 7919;
+  for (let by = 0; by < height; by += size) {
+    for (let bx = 0; bx < width; bx += size) {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      const v = lo + (s / 2 ** 32) * (hi - lo);
+      for (let y = by; y < Math.min(height, by + size); y++) {
+        for (let x = bx; x < Math.min(width, bx + size); x++) {
+          const i = (y * width + x) * 4;
+          data[i] = data[i + 1] = data[i + 2] = v;
+          data[i + 3] = 255;
+        }
+      }
+    }
+  }
+  return { data, width, height };
+}
 
 
 describe("findPage", () => {
@@ -108,12 +139,15 @@ describe("drawing the box", () => {
     { x: 0.25, y: 0.75 },
   ];
 
-  it("places the page where the whole picture is shown", () => {
+  it("places the page where the picture is shown, whole or filling the screen", () => {
     // A landscape picture in a portrait box: bars above and below.
     expect(containRect(480, 360, 390, 600)).toEqual({ x: 0, y: 153.75, width: 390, height: 292.5 });
     // A portrait picture in a wider box: bars at the sides.
     expect(containRect(1080, 1920, 390, 600)).toEqual({ x: 26.25, y: 0, width: 337.5, height: 600 });
     expect(containRect(0, 0, 390, 600)).toBeNull();
+    // Filling the screen (the camera): the picture overflows and is cropped at the sides.
+    expect(coverRect(480, 360, 390, 600)).toEqual({ x: -205, y: 0, width: 800, height: 600 });
+    expect(coverRect(1080, 1920, 390, 844)).toEqual({ x: -42.375, y: 0, width: 474.75, height: 844 });
     const placed = placeQuad(normalizeQuad([{ x: 40, y: 30 }, { x: 120, y: 30 }, { x: 120, y: 90 }, { x: 40, y: 90 }], 160, 120), {
       x: 10,
       y: 20,
@@ -149,6 +183,22 @@ describe("measures", () => {
     const moved = toLuma(makeFrame({ seed: 2, shift: 4 }));
     expect(frameDifference(a, b)).toBeLessThan(3);
     expect(frameDifference(a, moved)).toBeGreaterThan(6);
+  });
+
+  it("measures the writing on a page: ink on smooth paper", () => {
+    const measure = (frame: PixelFrame) => {
+      const luma = toLuma(frame);
+      return writing(luma, findPage(luma).quad!);
+    };
+    const page = measure(makeFrame());
+    expect(page.paper).toBeGreaterThan(200);
+    expect(page.ink).toBeGreaterThan(0.1);
+    expect(page.ink).toBeLessThan(0.45);
+    expect(page.smooth).toBeGreaterThan(0.4);
+    expect(measure(makeFrame({ ink: 225 })).ink).toBe(0);
+    // Faint text, such as a faded receipt, still counts as ink.
+    expect(measure(makeFrame({ ink: 185 })).ink).toBeGreaterThan(0.1);
+    expect(measure(blocks(1, 150, 240, 2)).smooth).toBeLessThan(0.12);
   });
 
   it("detects glare on the page but not on evenly bright paper", () => {
@@ -198,22 +248,23 @@ describe("FramingTracker", () => {
     expect(last.kind).toBe("blurry");
   });
 
-  it("captures a page that stays cut off once the phone has been calm for a second and a half", () => {
+  it("captures a page that stays cut off once the phone has been calm long enough", () => {
     const tracker = new FramingTracker();
     const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
+    const calmFrame = FRAMING.calmMs / 100;
     const kinds: string[] = [];
-    for (let i = 0; i < 20; i++) kinds.push(tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100).kind);
+    for (let i = 0; i <= calmFrame + 4; i++) kinds.push(tracker.update(makeFrame({ page: cutOff, seed: i + 1 }), i * 100).kind);
     expect(kinds[10]).toBe("cutOff");
-    expect(kinds[14]).toBe("cutOff");
-    expect(kinds[15]).toBe("ready");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 41 }), 2000)).toEqual({ kind: "ready", lenient: true });
+    expect(kinds[calmFrame - 1]).toBe("cutOff");
+    expect(kinds[calmFrame]).toBe("ready");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 99 }), FRAMING.calmMs + 500)).toEqual({ kind: "ready", lenient: true });
   });
 
   it("captures a tilted page, a blurry page, and a dim page once the phone is calm", () => {
     const calmly = (spec: Parameters<typeof makeFrame>[0], blurFrom = Infinity) => {
       const tracker = new FramingTracker();
       const seen: Situation[] = [];
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i <= FRAMING.calmMs / 100 + 2; i++) {
         const frame = makeFrame({ ...spec, seed: i + 1 });
         seen.push(tracker.update(i >= blurFrom ? blurFrame(frame, 2) : frame, i * 100));
       }
@@ -266,6 +317,46 @@ describe("FramingTracker", () => {
     expect(last.kind).toBe("cutOff");
   });
 
+  it("never takes a picture of something without writing on it", () => {
+    /** Frames of a still scene for a long time: whatever it is, it is calm and steady. */
+    const stare = (frame: (seed: number) => PixelFrame) => {
+      const tracker = new FramingTracker();
+      const seen: Situation[] = [];
+      for (let i = 0; i < 60; i++) seen.push(tracker.update(frame(i + 1), i * 100));
+      return seen;
+    };
+    const neverReady = (seen: Situation[]) => expect(seen.some((s) => s.kind === "ready" || s.kind === "samePage")).toBe(false);
+    // A blank sheet of paper, or a white wall: bright, still, and no ink.
+    const blank = stare((seed) => makeFrame({ ink: 225, seed }));
+    neverReady(blank);
+    expect(blank.at(-1)?.kind).toBe("noText");
+    // A keyboard: light marks on a dark board, mostly "ink".
+    const keyboard = stare((seed) => makeFrame({ background: 30, paper: 40, ink: 200, seed }));
+    neverReady(keyboard);
+    // A busy light pattern (stone, a patterned cloth) filling the picture: never smooth.
+    const pattern = stare(() => blocks(1, 150, 240, 2));
+    neverReady(pattern);
+    expect(pattern.at(-1)?.kind).toBe("noText");
+    // A dark-and-light texture filling the picture (a rug, gravel): mostly "ink".
+    const texture = stare(() => blocks(2, 40, 220, 2));
+    neverReady(texture);
+  });
+
+  it("does not take the page just read again until the view changes", () => {
+    const tracker = new FramingTracker();
+    const justRead = toLuma(makeFrame({ seed: 500 }));
+    tracker.requireChangeFrom(justRead);
+    const seen: Situation[] = [];
+    for (let i = 0; i < 30; i++) seen.push(tracker.update(makeFrame({ seed: i + 1 }), i * 100));
+    expect(seen.some((s) => s.kind === "ready")).toBe(false);
+    expect(seen.at(-1)).toEqual({ kind: "samePage" });
+    // The next page slides in (the view changes), then settles: now it is taken.
+    tracker.update(makeFrame({ page: null, seed: 40 }), 3000);
+    let last: Situation = { kind: "noPage" };
+    for (let i = 31; i < 60; i++) last = tracker.update(makeFrame({ seed: i + 1 }), i * 100);
+    expect(last.kind).toBe("ready");
+  });
+
   it("restarts the calm clock after a capture that did not work out", () => {
     const tracker = new FramingTracker();
     const cutOff = { x0: 0.5, y0: 0.1, x1: 1.3, y1: 0.9 };
@@ -274,8 +365,8 @@ describe("FramingTracker", () => {
     expect(last.kind).toBe("ready");
     tracker.resetSteady();
     expect(tracker.update(makeFrame({ page: cutOff, seed: 36 }), 3500).kind).toBe("cutOff");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 37 }), 4900).kind).toBe("cutOff");
-    expect(tracker.update(makeFrame({ page: cutOff, seed: 38 }), 5000).kind).toBe("ready");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 37 }), 3500 + FRAMING.calmMs - 100).kind).toBe("cutOff");
+    expect(tracker.update(makeFrame({ page: cutOff, seed: 38 }), 3500 + FRAMING.calmMs).kind).toBe("ready");
   });
 
   it("checks a captured still against the preview's sharpness", () => {

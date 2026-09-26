@@ -66,6 +66,10 @@ export interface FrameAnalysis {
   centerSharpness: number;
   /** Mean absolute difference from the previous frame (0 when there is none). */
   motion: number;
+  /** The page's paper brightness, how much of it is ink, and how much is smooth (see `writing`). */
+  paper: number;
+  ink: number;
+  smooth: number;
 }
 
 const NO_EDGES: Edges = { left: false, right: false, top: false, bottom: false };
@@ -476,7 +480,69 @@ export function findPage(luma: Luma): PageEstimate {
   const box = expand(text, width, height, 0.05);
   const coverage = boxArea(box) / frameArea;
   if (coverage < 0.02) return none;
-  return { found: true, box, quad: boxQuad(box), coverage, touches: touchingEdges(box, width, height), strategy: "edges" };
+  const touches = touchingEdges(box, width, height);
+  // Detail running off three or four sides with no paper around it is a patterned surface (a
+  // table's grain, a carpet, a keyboard), not a page.
+  if (countEdges(touches) >= 3) return none;
+  return { found: true, box, quad: boxQuad(box), coverage, touches, strategy: "edges" };
+}
+
+/**
+ * How much writing a page shows, inside its outline (pulled in from the edges so the table around
+ * it does not count): the paper's brightness (85th percentile), the fraction of pixels clearly
+ * darker than the paper (ink), and the fraction that is smooth (paper between the lines and in
+ * the margins). A document is mostly smooth paper with some ink. A blank sheet, a window, a lamp,
+ * or a white wall has almost no ink; a keyboard is mostly "ink"; a patterned surface such as a
+ * carpet, stone, or a busy cloth is hardly smooth anywhere.
+ */
+export function writing(luma: Luma, quad: Quad, inkContrast = 38): { paper: number; ink: number; smooth: number } {
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cy = (quad[0].y + quad[1].y + quad[2].y + quad[3].y) / 4;
+  const inner = quad.map((p) => ({ x: cx + (p.x - cx) * 0.88, y: cy + (p.y - cy) * 0.88 }));
+  const cross = (a: Point, b: Point, x: number, y: number) => (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+  const inside = (x: number, y: number) => {
+    let positive = 0;
+    let negative = 0;
+    for (let k = 0; k < 4; k++) {
+      const c = cross(inner[k]!, inner[(k + 1) % 4]!, x, y);
+      if (c > 0) positive++;
+      else if (c < 0) negative++;
+    }
+    return positive === 0 || negative === 0;
+  };
+  const x0 = Math.max(0, Math.floor(Math.min(...inner.map((p) => p.x))));
+  const x1 = Math.min(luma.width - 1, Math.ceil(Math.max(...inner.map((p) => p.x))));
+  const y0 = Math.max(0, Math.floor(Math.min(...inner.map((p) => p.y))));
+  const y1 = Math.min(luma.height - 1, Math.ceil(Math.max(...inner.map((p) => p.y))));
+  const { data, width, height } = luma;
+  const hist = new Float64Array(256);
+  let n = 0;
+  let smooth = 0;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (!inside(x + 0.5, y + 0.5)) continue;
+      const i = y * width + x;
+      hist[data[i]!]! += 1;
+      n++;
+      if (x > 0 && x < width - 1 && y > 0 && y < height - 1) {
+        const gradient = Math.abs(data[i + 1]! - data[i - 1]!) + Math.abs(data[i + width]! - data[i - width]!);
+        if (gradient <= 16) smooth++;
+      }
+    }
+  }
+  if (n === 0) return { paper: 0, ink: 0, smooth: 0 };
+  let acc = 0;
+  let paper = 255;
+  for (let v = 0; v < 256; v++) {
+    acc += hist[v]!;
+    if (acc >= n * 0.85) {
+      paper = v;
+      break;
+    }
+  }
+  let dark = 0;
+  for (let v = 0; v < Math.max(0, paper - inkContrast); v++) dark += hist[v]!;
+  return { paper, ink: dark / n, smooth: smooth / n };
 }
 
 /** How far two boxes differ: the largest change of any edge, in pixels. */
@@ -560,6 +626,7 @@ export function analyzeFrame(frame: PixelFrame, previous: Luma | null): FrameAna
   const frameMean = mean(luma.data);
   const page = findPage(luma);
   const stats = page.box ? boxStats(luma, page.box) : { mean: frameMean, glare: 0, median: 0 };
+  const written = page.quad ? writing(luma, page.quad) : { paper: 0, ink: 0, smooth: 0 };
   return {
     luma,
     frameMean,
@@ -569,5 +636,8 @@ export function analyzeFrame(frame: PixelFrame, previous: Luma | null): FrameAna
     sharpness: laplacianVariance(luma, page.box),
     centerSharpness: laplacianVariance(luma, centerBox(luma.width, luma.height)),
     motion: previous ? frameDifference(luma, previous) : 0,
+    paper: written.paper,
+    ink: written.ink,
+    smooth: written.smooth,
   };
 }

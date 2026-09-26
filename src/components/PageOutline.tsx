@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import type { Quad } from "@/lib/client/vision/analysis";
-import { approachQuad, containRect, placeQuad, quadPoints } from "@/lib/client/vision/outline";
+import { approachQuad, coverRect, placeQuad, quadPoints } from "@/lib/client/vision/outline";
 import { useController, useStore } from "./hooks";
 
 /**
@@ -25,8 +25,8 @@ export function PageOutline({ videoRef }: { videoRef: RefObject<HTMLVideoElement
       frame = requestAnimationFrame(draw);
       const video = videoRef.current;
       const quad = controller.outline.get().quad;
-      // The picture is shown whole, so the page's place in the frame maps straight to the screen.
-      const rect = video && containRect(video.videoWidth, video.videoHeight, video.clientWidth, video.clientHeight);
+      // The picture fills the screen and its overflow is cropped; the box follows the same mapping.
+      const rect = video && coverRect(video.videoWidth, video.videoHeight, video.clientWidth, video.clientHeight);
       if (!quad || !rect) {
         shown = null;
       } else {
@@ -45,7 +45,13 @@ export function PageOutline({ videoRef }: { videoRef: RefObject<HTMLVideoElement
 
   const state = outline.quad ? (outline.ready ? "ready" : "seen") : "hidden";
   return (
-    <svg aria-hidden="true" focusable="false" data-testid="page-outline" data-state={state} className="page-outline pointer-events-none absolute inset-0 h-full w-full">
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      data-testid="page-outline"
+      data-state={state}
+      className="page-outline pointer-events-none absolute inset-0 h-full w-full overflow-hidden"
+    >
       <polygon ref={haloRef} className="page-outline-halo" />
       <polygon ref={lineRef} className="page-outline-line" />
     </svg>

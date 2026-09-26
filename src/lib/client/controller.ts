@@ -6,7 +6,7 @@ import { ApiError, createApiClient, type ApiClient } from "./api";
 import { Sounds } from "./audio/sounds";
 import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
 import { FrameSampler } from "./camera/frameSampler";
-import { laplacianVariance, toLuma } from "./vision/analysis";
+import { laplacianVariance, toLuma, type Luma } from "./vision/analysis";
 import { blobToBase64, imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
 import { docToAskPages, type Doc, type DocPage } from "./document/model";
 import { DocumentSession, type PageReadCallbacks, type PreparedPdf } from "./document/session";
@@ -153,6 +153,8 @@ export class AppController {
   private analysisTimer: unknown = null;
   /** When the page was last seen, so the box survives a frame or two without it. */
   private outlineSeenAt = -Infinity;
+  /** The camera's view when the last picture was taken: the same view is not taken again. */
+  private lastCaptureView: Luma | null = null;
   /** Automatic capture fires at most once per visit to the camera screen (PROMPT.md 6.3). */
   private armed = false;
   private torchTried = false;
@@ -467,6 +469,9 @@ export class AppController {
     if (this.ui.get().cameraMode !== "camera") return;
     this.tracker = new FramingTracker();
     this.tracker.calmMs = this.calmMsForRetries();
+    // After New document, Add page, or a page that could not be read, the page just photographed
+    // is often still in view: wait for the view to change. A retake means the same page again.
+    this.tracker.requireChangeFrom(this.retakeTarget === null ? this.lastCaptureView : null);
     this.cuePolicy.reset();
     this.outline.set(NO_OUTLINE);
     this.armed = true;
@@ -528,7 +533,8 @@ export class AppController {
    */
   private showOutline(situation: Situation, now: number): void {
     const analysis = this.tracker.lastAnalysis;
-    const quad = analysis?.page.quad;
+    // The box means "I see a page with writing": nothing is outlined around a wall or a table.
+    const quad = this.tracker.lastIsDocument ? analysis?.page.quad : null;
     if (analysis && quad) {
       this.outlineSeenAt = now;
       this.outline.set({ quad: normalizeQuad(quad, analysis.luma.width, analysis.luma.height), ready: situation.kind === "ready" });
@@ -556,6 +562,7 @@ export class AppController {
     if (!camera || this.ui.get().capturing) return;
     this.armed = false;
     this.lastCaptureAutomatic = true;
+    this.lastCaptureView = this.tracker.lastAnalysis?.luma ?? null;
     this.ui.update({ capturing: true });
     this.sounds.shutter();
     try {
@@ -649,6 +656,7 @@ export class AppController {
       this.say("The camera isn't working. Press Use phone camera instead.");
       return;
     }
+    this.lastCaptureView = this.tracker.lastAnalysis?.luma ?? null;
     this.sounds.shutter();
     try {
       const still = await camera.captureStill(this.burstOptions());
