@@ -206,6 +206,18 @@ Do each with a receipt, a bill, and a statement.
 - [ ] Settings, Voice, Tone: moving the slider says "Tone 1.1." and the voice sounds higher. It is kept after closing Safari.
 - [ ] Settings, Voice, Volume: moving the slider says "Volume 8." and the voice is quieter. The phone's own volume buttons still work. It is kept after closing Safari.
 
+## 12. French letters (only after translation is switched on)
+
+Skip this section until the owner has set `TRANSLATE_FROM=fr` (see `docs/SETUP.md`).
+
+- [ ] Take a picture of a letter written in French without asking anything. The app says "Translated from French.", then what the letter is and its main fact, in English.
+- [ ] Press Play: the title is followed by "Translated from French.", and the whole letter is read in English, in order, with nothing left out.
+- [ ] Names, the street address, amounts (for example "412,00 €"), dates, and reference numbers are exactly as on the letter. Note anything that was changed: ______
+- [ ] Hold the screen and ask "when is it due?": the answer is in English and matches the letter.
+- [ ] Cover one number with a finger: the app says it is unclear or possibly, never a different number.
+- [ ] A letter in English, and one in a language other than French, are read as before, with no "Translated from".
+- [ ] After `fly secrets unset TRANSLATE_FROM`, a French letter is read in French again.
+
 ## 8. Recording results
 
 For each failed item write: the step, what was expected, what happened, and the exact words the app said. Also note the iPhone model and iOS version (Settings, General, About).

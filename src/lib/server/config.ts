@@ -1,3 +1,5 @@
+import { parseTranslateFrom } from "@/lib/shared/translation";
+
 /** The model used for reading pages and answering questions unless overridden by environment. */
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
@@ -25,9 +27,14 @@ export interface ServerEnv {
   askModel: string;
   /** Extra hostnames allowed in the Origin header, for custom domains behind a proxy. */
   extraAllowedHosts: string[];
+  /**
+   * Languages whose documents are translated into English (TRANSLATE_FROM, for example "fr").
+   * Empty, the default, switches translation off: the prompts are exactly as without it.
+   */
+  translateFrom: string[];
 }
 
-export function serverEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
+export function serverEnv(env: Record<string, string | undefined> = process.env): ServerEnv {
   return {
     passcode: env.APP_PASSCODE ? env.APP_PASSCODE : undefined,
     hasApiKey: Boolean(env.ANTHROPIC_API_KEY),
@@ -37,5 +44,6 @@ export function serverEnv(env: NodeJS.ProcessEnv = process.env): ServerEnv {
       .split(",")
       .map((host) => host.trim().toLowerCase())
       .filter(Boolean),
+    translateFrom: parseTranslateFrom(env.TRANSLATE_FROM),
   };
 }

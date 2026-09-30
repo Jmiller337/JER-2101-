@@ -74,6 +74,21 @@ describe("DocumentSession with a PDF", () => {
   });
 });
 
+describe("DocumentSession with a translated page", () => {
+  it("keeps which language the page came from, and hints that language for the next page", async () => {
+    const storage = new MemoryStorage();
+    const translated: ReadEvent = { ...META, translatedFrom: "fr" } as ReadEvent;
+    const client = api([translated, BLOCK, { type: "done", blocks: 1 }]);
+    const session = new DocumentSession({ api: client, passcode: () => "p", storage });
+    await session.readPage(IMAGE, callbacks());
+    expect(session.doc?.pages[0]).toMatchObject({ language: "en", translatedFrom: "fr" });
+    expect(loadDoc(storage)?.pages[0]?.translatedFrom).toBe("fr");
+    // The words are English, but the next page is most likely French too.
+    await session.readPage(IMAGE, callbacks());
+    expect(client.requests[1]).toMatchObject({ languageHint: "fr" });
+  });
+});
+
 describe("DocumentSession", () => {
   it("builds a page from the stream and saves the document", async () => {
     const storage = new MemoryStorage();

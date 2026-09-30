@@ -145,6 +145,24 @@ It prints when the title would start being spoken, the time to the first paragra
 
 The server logs one line per request with timings, token counts, and the outcome (never the document text): Vercel project, **Logs**; or `fly logs`.
 
+### Translating French documents (built, switched off)
+
+The app can read a letter written in French in English: it says "Translated from French." first, then answers and reads in English, with names, addresses, amounts, and numbers kept exactly as printed. It is **off** until you switch it on, and nothing changes on the phone while it is off.
+
+Before switching it on, try it with a real French letter and the real API on your computer:
+
+```
+TRANSLATE_FROM=fr ANTHROPIC_API_KEY=your-key npm run check:real-api path/to/french-letter.jpg
+```
+
+Check the English against the letter, especially every name, amount, and date. Then, to switch it on for the phone:
+
+```
+fly secrets set TRANSLATE_FROM=fr --app maria-reader
+```
+
+To switch it off again: `fly secrets unset TRANSLATE_FROM --app maria-reader`. (On Vercel, add or remove an environment variable `TRANSLATE_FROM` with the value `fr`, then redeploy.) Both restart the app by themselves; no code changes. Only French can be switched on for now; other languages need to be added to `src/lib/shared/translation.ts` and checked the same way.
+
 ---
 
 ## 6. Privacy

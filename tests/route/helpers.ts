@@ -12,6 +12,7 @@ export const TEST_ENV: ServerEnv = {
   readModel: "claude-opus-5-5",
   askModel: "claude-opus-5-5",
   extraAllowedHosts: [],
+  translateFrom: [],
 };
 
 /** A small valid base64 payload (the handler never decodes it; the fake model ignores it). */

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
 import { chunkText } from "@/lib/server/fakeModel";
+import { READ_PDF_SYSTEM_PROMPT, READ_SYSTEM_PROMPT, readPdfSystemPrompt, readSystemPrompt } from "@/lib/server/prompts";
 import { handleRead } from "@/lib/server/readHandler";
 import { IMAGE_DATA, makeDeps, ndjson, postJson, readNdjson, TEST_ENV } from "./helpers";
 
@@ -50,6 +51,27 @@ describe("POST /api/read", () => {
     // The log says a question came, never what it was.
     expect(deps.logs[0]).toMatchObject({ asked: true });
     expect(JSON.stringify(deps.logs[0])).not.toContain("amount due");
+  });
+
+  it("leaves translation off by default: the prompt is unchanged and no page is marked translated", async () => {
+    const deps = makeDeps({ chunks: [ndjson({ ...META, translatedFrom: "fr" }, BLOCK)] });
+    const res = await handleRead(postJson("/api/read", GOOD_BODY), deps);
+    expect((await readNdjson(res))[0]).toEqual(META);
+    expect(deps.calls[0]!.system).toBe(READ_SYSTEM_PROMPT);
+  });
+
+  it("with TRANSLATE_FROM=fr, asks for French pages in English and says which were translated", async () => {
+    const env = { ...TEST_ENV, translateFrom: ["fr"] };
+    const deps = makeDeps({ chunks: chunkText(ndjson({ ...META, translatedFrom: "fr" }, BLOCK), 13) }, { env });
+    const res = await handleRead(postJson("/api/read", GOOD_BODY), deps);
+    expect(await readNdjson(res)).toEqual([{ ...META, translatedFrom: "fr" }, BLOCK, { type: "done", blocks: 1 }]);
+    expect(deps.calls[0]!.system).toBe(readSystemPrompt(["fr"]));
+    expect(deps.calls[0]!.system).not.toBe(READ_SYSTEM_PROMPT);
+
+    const pdfDeps = makeDeps({ chunks: [ndjson(META)] }, { env });
+    await (await handleRead(postJson("/api/read", { pdf: { data: IMAGE_DATA }, pageNumber: 1 }), pdfDeps)).text();
+    expect(pdfDeps.calls[0]!.system).toBe(readPdfSystemPrompt(["fr"]));
+    expect(pdfDeps.calls[0]!.system).not.toBe(READ_PDF_SYSTEM_PROMPT);
   });
 
   it("rejects an empty or overlong question", async () => {

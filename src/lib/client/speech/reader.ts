@@ -105,13 +105,18 @@ export class Reader {
     return ACTIVE.has(this.status);
   }
 
-  /** A page's meta line arrived: add its title (page 1) or "Page N.". */
-  beginPage(page: number, meta: { title: string; language: string }): void {
+  /**
+   * A page's meta line arrived: add its title (page 1) or "Page N.". A `note` ("Translated from
+   * French.") is said right after it.
+   */
+  beginPage(page: number, meta: { title: string; language: string; note?: string }): void {
     this.pages.set(page, { lang: meta.language, blockCount: 0, complete: false });
+    const note = meta.note ? ` ${meta.note}` : "";
     if (page === 1) {
-      if (meta.title) this.insert({ kind: "title", text: meta.title, lang: this.deps.uiLang, page });
+      const title = meta.title && note ? `${meta.title.trim().replace(/[.!?]*$/, ".")}${note}` : meta.title || note.trim();
+      if (title) this.insert({ kind: "title", text: title, lang: this.deps.uiLang, page });
     } else {
-      this.insert({ kind: "pageStart", text: `Page ${page}.`, lang: this.deps.uiLang, page });
+      this.insert({ kind: "pageStart", text: `Page ${page}.${note}`, lang: this.deps.uiLang, page });
     }
     this.itemsChanged();
   }
@@ -371,7 +376,7 @@ export class Reader {
     }
     let spoken = item.spoken;
     if (this.pendingAddedPage !== null && item.kind === "pageStart" && item.page === this.pendingAddedPage) {
-      spoken = `Page ${item.page} added.`;
+      spoken = spoken.replace(/^Page \d+\./, `Page ${item.page} added.`);
       this.pendingAddedPage = null;
     }
     this.setStatus("playing");

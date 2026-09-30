@@ -8,7 +8,11 @@
  * Round 2 (docs/PROMPT-2.md): before the page's text the model writes one answer line, spoken on
  * its own: the answer to what the user asked before the photo, or, with no question, what the
  * document is and its headline fact. The full text still follows, for Play.
+ * Translation (built, switched off unless TRANSLATE_FROM is set): pages in a listed language are
+ * written in English instead of transcribed, with every fact kept exactly as printed.
  */
+
+import { TRANSLATABLE_LANGUAGES } from "@/lib/shared/translation";
 
 const OUTPUT_RULES = `Output NDJSON only: one JSON object per line, no prose, no code fences, no blank lines.`;
 
@@ -94,6 +98,42 @@ Before the first block of every page after the first, write a page line: {"type"
 ${TEXT_RULES}
 
 Finish with: {"type":"done","blocks":<number of block lines>}`;
+
+/** "French", "French or Spanish", "French, Spanish, or German". */
+function languageList(codes: readonly string[]): string {
+  const names = codes.map((code) => TRANSLATABLE_LANGUAGES[code] ?? code);
+  if (names.length <= 2) return names.join(" or ");
+  return `${names.slice(0, -1).join(", ")}, or ${names[names.length - 1]}`;
+}
+
+/**
+ * The translation rules, for the languages switched on. `unit` is "page" for a photo and
+ * "document" for a PDF.
+ */
+export function translationRules(codes: readonly string[], unit: "page" | "document"): string {
+  const list = languageList(codes);
+  const example = codes[0] ?? "fr";
+  return `Translation into English. When the ${unit}'s main language is ${list}, write its text in English instead of transcribing it. This replaces "keep the original language" for that ${unit} only; every other rule still applies. In the meta line set "language" to "en" and add "translatedFrom":"<the ${unit}'s language, for example ${example}>". A ${unit} in any other language is transcribed as usual, with no "translatedFrom".
+- Translate everything, sentence by sentence, in the same order and the same blocks. Do not summarize, shorten, explain, or leave anything out. The listener must be able to rely on the translation as on the original.
+- Keep exactly as printed, untranslated: names of people, businesses, organisations, and places; street addresses; amounts, prices, and currencies ("412,00 €" stays "412,00 €"); phone, account, reference, and policy numbers; codes; email and web addresses. Dates are written in English with their numbers unchanged ("le 28 octobre 2026" is "October 28, 2026").
+- Translate meaning-changing words exactly: not, no, never, late, overdue, paid, unpaid, due, cancelled, approved, denied, and the like. A word or phrase with no clear English meaning is kept in the original language rather than guessed.
+- The [?] and [unclear] markers stay where they are. Never translate a word you could not read, and never make one up.
+- English text on the ${unit} stays as it is.`;
+}
+
+function withTranslation(prompt: string, codes: readonly string[], unit: "page" | "document"): string {
+  if (codes.length === 0) return prompt;
+  return prompt.replace("\n\nFinish with:", `\n\n${translationRules(codes, unit)}\n\nFinish with:`);
+}
+
+/** The read prompt, with the translation rules when translation is switched on. */
+export function readSystemPrompt(translateFrom: readonly string[] = []): string {
+  return withTranslation(READ_SYSTEM_PROMPT, translateFrom, "page");
+}
+
+export function readPdfSystemPrompt(translateFrom: readonly string[] = []): string {
+  return withTranslation(READ_PDF_SYSTEM_PROMPT, translateFrom, "document");
+}
 
 /** The part of the instruction that says what the answer line must answer. */
 function questionText(question: string | null | undefined): string {

@@ -200,6 +200,14 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 - **Not in this round:** offline reading (reading needs the model; the owner's decision), vibration (not available to websites), reading inside other apps (not possible from a web app), and always-on listening or a wake word (a web app cannot listen in the background or while it speaks).
 - **Not verified on a real iPhone:** that Safari lets speech recognition start from a hold rather than a tap (if it does not, holding plays the rising tone but never hears anything; the fix would be a tap-to-talk button), how well recognition works in her voice and room, and that the ticks and chime are loud enough under the speech.
 
+## Translating French documents (built, not shipped)
+
+- A French letter can be read in English: the phone says "Translated from French." first, then the answer and, on Play, the whole letter in English. Names, addresses, amounts (in euros as printed), phone and reference numbers, codes, and doubtful words stay exactly as on the page; dates keep their numbers.
+- **It is switched off.** It runs only when the server has `TRANSLATE_FROM=fr` (see `docs/SETUP.md`, "Translating French documents"). Without it the reading prompts are exactly as before and no page is ever marked as translated, so deploying this changes nothing for her.
+- Chosen with the owner: translate documents (not the app's own words), French first, behind a switch that stays off. Other languages are one line each in `src/lib/shared/translation.ts`, and each needs checking on real letters.
+- **Not verified** with the real model or a real French letter: no API key in the build environment. Run `npm run check:real-api` with `TRANSLATE_FROM=fr` on a French letter before switching it on.
+- The reading screen shows "Translated from French" in the small capsule under the title; no control was added or moved.
+
 ## What still needs the owner
 
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).
@@ -210,6 +218,7 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 6. **A sentence about the reading service's own data retention** for the privacy statement, after checking Anthropic's current policy. The statement speaks only for the app and its server until then (`PRIVACY_STATEMENT` in `src/lib/client/controller.ts`).
 7. **Books, medical apps, and grocery apps** came up in the meeting and are not in this round. Screenshots through Photos are the way to read another app today.
 8. **Sign-off before any control moves.** She finds controls by memory; round 2 moved nothing.
+9. **Switching on French translation** when you are ready: check it with a real French letter first (`docs/SETUP.md`), then set `TRANSLATE_FROM=fr` and run section 12 of `docs/TESTING-ON-IPHONE.md`.
 
 ## Assumptions made while building
 

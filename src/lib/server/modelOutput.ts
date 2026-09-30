@@ -9,6 +9,7 @@ import {
   type MetaEvent,
   type ReadEvent,
 } from "@/lib/shared/protocol";
+import { baseLanguage } from "@/lib/shared/translation";
 
 /**
  * If no valid meta (or block) line has appeared within this many characters of model output,
@@ -64,6 +65,11 @@ export class ModelOutputParser {
       firstPage?: number;
       /** A PDF: the model's page lines start new pages. Ignored for a photo. */
       multiPage?: boolean;
+      /**
+       * Languages the server translates into English. A meta line's `translatedFrom` is kept
+       * only for one of these, so with translation switched off it never reaches the phone.
+       */
+      translateFrom?: readonly string[];
     } = {},
   ) {
     this.page = opts.firstPage ?? 1;
@@ -294,6 +300,7 @@ export class ModelOutputParser {
     // A "warning" the model may still write is dropped: remarks about the photo are never
     // spoken. The problem line exists only for a page that could not be read at all.
     const problem = status === "retry" ? cleanString(obj.problem, 400) || DEFAULT_PROBLEM : "";
+    const translatedFrom = status === "ok" ? this.translatedFrom(obj.translatedFrom, language) : null;
     return {
       type: "meta",
       status,
@@ -301,7 +308,17 @@ export class ModelOutputParser {
       kind,
       title,
       ...(problem ? { problem } : {}),
+      ...(translatedFrom ? { translatedFrom } : {}),
     };
+  }
+
+  /** The language a translated page came from, if translation from it is switched on. */
+  private translatedFrom(value: unknown, language: string): string | null {
+    const from = normalizeLanguage(value);
+    if (!from) return null;
+    const code = baseLanguage(from);
+    if (!this.opts.translateFrom?.includes(code) || baseLanguage(language) === code) return null;
+    return code;
   }
 
   private syntheticMeta(): MetaEvent {

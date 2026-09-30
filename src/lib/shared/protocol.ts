@@ -65,6 +65,11 @@ export interface MetaEvent {
   title: string;
   /** Only with status "retry": what the user should change before the next photo. */
   problem?: string;
+  /**
+   * The page was in this language and its text is an English translation (only when the server
+   * has translation switched on; see src/lib/shared/translation.ts).
+   */
+  translatedFrom?: string;
 }
 
 export interface BlockEvent {
@@ -182,6 +187,7 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
       if (!isString(value.kind, 0, LIMITS_TEXT.kind)) return null;
       if (!isString(value.title, 0, LIMITS_TEXT.title)) return null;
       if (!optionalString(value.problem, LIMITS_TEXT.title)) return null;
+      if (value.translatedFrom !== undefined && !isString(value.translatedFrom, 2, LIMITS_TEXT.language)) return null;
       const meta: MetaEvent = {
         type: "meta",
         status: value.status,
@@ -190,6 +196,7 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
         title: value.title,
       };
       if (typeof value.problem === "string") meta.problem = value.problem;
+      if (typeof value.translatedFrom === "string") meta.translatedFrom = value.translatedFrom;
       return meta;
     }
     case "answer":

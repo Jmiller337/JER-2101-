@@ -10,7 +10,7 @@ import type { HandlerDeps } from "./deps";
 import { classifyModelError, describeError } from "./errors";
 import { jsonResponse, NDJSON_HEADERS } from "./http";
 import { ModelOutputParser } from "./modelOutput";
-import { READ_PDF_SYSTEM_PROMPT, READ_SYSTEM_PROMPT, readPdfUserText, readUserText } from "./prompts";
+import { readPdfSystemPrompt, readPdfUserText, readSystemPrompt, readUserText } from "./prompts";
 
 /** The Messages API request for reading one page or one PDF (PROMPT.md sections 6.5 and 7). */
 export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamParams {
@@ -26,7 +26,7 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
     return {
       ...common,
       max_tokens: LIMITS.maxPdfTokens,
-      system: READ_PDF_SYSTEM_PROMPT,
+      system: readPdfSystemPrompt(env.translateFrom),
       messages: [
         {
           role: "user",
@@ -43,7 +43,7 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
   return {
     ...common,
     max_tokens: LIMITS.maxTokens,
-    system: READ_SYSTEM_PROMPT,
+    system: readSystemPrompt(env.translateFrom),
     messages: [
       {
         role: "user",
@@ -93,6 +93,7 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
     languageHint: request.languageHint,
     firstPage: request.pageNumber,
     multiPage: Boolean(request.pdf),
+    translateFrom: deps.env.translateFrom,
   });
   const encoder = new TextEncoder();
   let firstEventMs: number | null = null;

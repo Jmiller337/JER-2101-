@@ -191,6 +191,27 @@ describe("Reader", () => {
     expect(port.texts.slice(-5)).toEqual(["Your statement is ready.", "Please pay by Friday.", "Page 2.", "Second page text.", END_OF_DOCUMENT]);
   });
 
+  it("says a translated page's note after its title, and after 'Page 2 added'", () => {
+    const { port, reader } = setup();
+    reader.setLoading(true);
+    reader.beginPage(1, { title: "A letter from the City of Lyon", language: "en", note: "Translated from French." });
+    reader.addBlock(1, 0, "paragraph", "Your tax is due.");
+    reader.completePage(1);
+    reader.setLoading(false);
+    reader.play();
+    port.finishAll();
+    expect(port.texts.slice(0, 2)).toEqual(["A letter from the City of Lyon. Translated from French.", "Your tax is due."]);
+
+    reader.setLoading(true);
+    reader.beginPage(2, { title: "", language: "en", note: "Translated from French." });
+    reader.queueAddedPage(2);
+    reader.addBlock(2, 0, "paragraph", "Page two.");
+    reader.completePage(2);
+    reader.setLoading(false);
+    reader.toggle();
+    expect(port.speaking).toBe("Page 2 added. Translated from French.");
+  });
+
   it("after the end, Play starts at the added page with 'Page 2 added'", () => {
     const { port, reader } = setup();
     loadPageOne(reader);

@@ -8,6 +8,7 @@ const env: ServerEnv = {
   readModel: "m",
   askModel: "m",
   extraAllowedHosts: ["reader.example.dev"],
+  translateFrom: [],
 };
 
 function request(headers: Record<string, string>): Request {

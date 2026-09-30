@@ -17,6 +17,7 @@ import {
 import { ReaderControls } from "../ReaderControls";
 import { ReadingTopBar, type MenuEntry } from "../ReadingTopBar";
 import { Transcript } from "../Transcript";
+import { translationNote } from "@/lib/shared/translation";
 import { Button } from "../ui";
 import { HOLD_CLASSES, holdProps, useHoldToTalk } from "../useHoldToTalk";
 
@@ -46,6 +47,8 @@ export function ReadingScreen() {
   const title = doc?.title || (waitingFor ? `Reading page ${waitingFor}…` : "Reading");
   const pageCount = doc?.pages.length ?? 0;
   const kind = doc?.pages[0]?.kind;
+  // A translated document says so under its title: "Letter · 1 page · Translated from French".
+  const translatedFrom = doc?.pages.find((p) => p.translatedFrom)?.translatedFrom;
   // A page whose read stopped part way can be photographed again, as long as it is the last page.
   const lastPage = doc?.pages[doc.pages.length - 1];
   const retakeNumber = lastPage?.failed && !lastPage.fromPdf && session.activeReads === 0 ? lastPage.number : null;
@@ -84,7 +87,11 @@ export function ReadingScreen() {
         <header className="mb-8">
           {doc && (
             <p className="mb-3 inline-flex items-center rounded-full bg-accent-soft px-3.5 py-1 text-lg font-semibold text-accent">
-              {[kind && kind !== "other" ? kind.charAt(0).toUpperCase() + kind.slice(1) : null, pageCount === 1 ? "1 page" : `${pageCount} pages`]
+              {[
+                kind && kind !== "other" ? kind.charAt(0).toUpperCase() + kind.slice(1) : null,
+                pageCount === 1 ? "1 page" : `${pageCount} pages`,
+                translatedFrom ? translationNote(translatedFrom).replace(/\.$/, "") : null,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>

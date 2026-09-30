@@ -17,6 +17,8 @@ export interface DocPage {
   failed?: boolean;
   /** Read from a PDF rather than photographed (it cannot be retaken with the camera). */
   fromPdf?: boolean;
+  /** The page was in this language; its text is an English translation. */
+  translatedFrom?: string;
 }
 
 export interface Doc {
@@ -40,11 +42,12 @@ function parseBlock(value: unknown): DocBlock | null {
 
 function parsePage(value: unknown): DocPage | null {
   if (!isObject(value)) return null;
-  const { number, language, kind, title, blocks, complete, failed, fromPdf } = value;
+  const { number, language, kind, title, blocks, complete, failed, fromPdf, translatedFrom } = value;
   if (typeof number !== "number" || !Number.isInteger(number) || number < 1) return null;
   if (typeof language !== "string" || typeof kind !== "string" || typeof title !== "string") return null;
   if (typeof complete !== "boolean" || (failed !== undefined && typeof failed !== "boolean")) return null;
   if (fromPdf !== undefined && typeof fromPdf !== "boolean") return null;
+  if (translatedFrom !== undefined && typeof translatedFrom !== "string") return null;
   if (!Array.isArray(blocks)) return null;
   const parsed = blocks.map(parseBlock);
   if (parsed.some((b) => b === null)) return null;
@@ -57,6 +60,7 @@ function parsePage(value: unknown): DocPage | null {
     complete,
     ...(failed !== undefined ? { failed } : {}),
     ...(fromPdf !== undefined ? { fromPdf } : {}),
+    ...(translatedFrom !== undefined ? { translatedFrom } : {}),
   };
 }
 

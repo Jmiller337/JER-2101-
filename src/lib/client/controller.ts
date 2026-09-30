@@ -1,5 +1,6 @@
 import { CAMERA_MESSAGES, spokenError } from "@/lib/shared/messages";
 import { ASK_LIMITS, MAX_PDF_BYTES, type ChatTurn, type ErrorCode, type MetaEvent } from "@/lib/shared/protocol";
+import { translationNote } from "@/lib/shared/translation";
 import { Announcer, type AnnounceOptions, type Channel } from "./announce/announcer";
 import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
@@ -851,7 +852,9 @@ export class AppController {
       onPageStart: (page, meta) => {
         this.autoRetries = 0;
         this.sounds.pageFound();
-        this.reader.beginPage(page.number, { title: meta.title, language: meta.language });
+        // A translated page says so once, after its title (the later pages of a PDF need not).
+        const note = page.number === pageNumber && page.translatedFrom ? translationNote(page.translatedFrom) : undefined;
+        this.reader.beginPage(page.number, { title: meta.title, language: meta.language, note });
         if (adding && page.number === pageNumber) this.reader.queueAddedPage(page.number);
         if (page.number === pageNumber) {
           firstMeta = meta;
@@ -861,7 +864,7 @@ export class AppController {
       },
       onAnswer: (page, text) => {
         if (page.number !== pageNumber || !answeredNow()) return;
-        this.speakAnswer(text, question, isPdf);
+        this.speakAnswer(text, question, isPdf, page.translatedFrom);
       },
       onBlock: (page, index, block) => {
         // The model left out the answer line: in VoiceOver mode say what the page is, as before,
@@ -907,16 +910,19 @@ export class AppController {
    * The short answer before the text: to the question asked before the photo, or, with none, what
    * the document is. Said once, then the app waits: the whole text only when the user asks.
    */
-  private speakAnswer(text: string, question: string | null, isPdf: boolean): void {
+  private speakAnswer(text: string, question: string | null, isPdf: boolean, translatedFrom?: string): void {
     if (question) this.recordAnswer(question, text);
     this.lastAnswer = text;
     this.lastSaid = text;
+    // A translated page says so before anything from it is said.
+    const note = translatedFrom ? translationNote(translatedFrom) : "";
     if (!this.appVoiceActive) {
       // VoiceOver reads the text as written; "Page 1 ready." follows when the page is complete.
-      this.say(text);
+      this.say(`${note} ${text}`.trim());
       return;
     }
     this.stopAnswer();
+    if (note) this.say(note);
     // Not on a photographed page: it may be on the back (a PDF has all its pages already).
     const notFound = question !== null && !isPdf && /^I can't find\b/.test(text);
     const followUp = !question ? FOLLOW_UP_OVERVIEW : notFound ? FOLLOW_UP_NOT_FOUND : FOLLOW_UP_ANSWERED;
@@ -941,8 +947,8 @@ export class AppController {
       this.askAboutDocument(question);
       return;
     }
-    const title = sentence(page.title);
-    if (!title || page.blocks.length === 0) return; // "I couldn't find any text" is said instead
+    const title = [sentence(page.title), page.translatedFrom ? translationNote(page.translatedFrom) : ""].filter(Boolean).join(" ");
+    if (!sentence(page.title) || page.blocks.length === 0) return; // "I couldn't find any text" is said instead
     if (this.appVoiceActive) this.say(`${title} ${FOLLOW_UP_OVERVIEW}`);
     else this.say(title);
   }
@@ -1010,11 +1016,14 @@ export class AppController {
 
   private restoreDocument(doc: Doc): void {
     this.reader.reset();
-    for (const page of doc.pages) {
-      this.reader.beginPage(page.number, { title: page.title, language: page.language });
-      page.blocks.forEach((block, index) => this.reader.addBlock(page.number, index, block.kind, block.text));
+    doc.pages.forEach((page, index) => {
+      const previous = doc.pages[index - 1];
+      const continuesTranslatedPdf = page.fromPdf && previous?.fromPdf && previous.translatedFrom;
+      const note = page.translatedFrom && !continuesTranslatedPdf ? translationNote(page.translatedFrom) : undefined;
+      this.reader.beginPage(page.number, { title: page.title, language: page.language, note });
+      page.blocks.forEach((block, i) => this.reader.addBlock(page.number, i, block.kind, block.text));
       this.reader.completePage(page.number);
-    }
+    });
     this.navigate("reading");
     const title = sentence(doc.title);
     this.say(

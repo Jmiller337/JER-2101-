@@ -147,7 +147,7 @@ export class DocumentSession {
         {
           ...source,
           pageNumber,
-          languageHint: this.doc?.language ?? null,
+          languageHint: this.languageHint(),
           ...(question ? { question } : {}),
         },
         passcode,
@@ -171,6 +171,7 @@ export class DocumentSession {
                 blocks: [],
                 complete: false,
                 ...(isPdf ? { fromPdf: true } : {}),
+                ...(event.translatedFrom ? { translatedFrom: event.translatedFrom } : {}),
               };
               this.addPage(page);
               cb.onPageStart(page, event);
@@ -190,6 +191,7 @@ export class DocumentSession {
                 blocks: [],
                 complete: false,
                 fromPdf: true,
+                ...(page.translatedFrom ? { translatedFrom: page.translatedFrom } : {}),
               };
               this.addPage(page);
               cb.onPageStart(page, { ...meta, title: "" });
@@ -254,6 +256,16 @@ export class DocumentSession {
       }
     }
     return abort.signal.aborted ? "aborted" : outcome;
+  }
+
+  /**
+   * The language the next page is probably in. A translated document's words are English, but
+   * its next page is most likely in the language it was translated from.
+   */
+  private languageHint(): string | null {
+    const doc = this.doc;
+    if (!doc) return null;
+    return doc.pages.find((p) => p.translatedFrom)?.translatedFrom ?? doc.language;
   }
 
   private addPage(page: DocPage): void {
