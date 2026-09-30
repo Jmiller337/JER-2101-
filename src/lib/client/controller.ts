@@ -11,13 +11,16 @@ import { blobToBase64, imageFromFile, prepareImage, type PreparedImage } from ".
 import { docToAskPages, type Doc, type DocPage } from "./document/model";
 import { DocumentSession, type PageReadCallbacks, type PreparedPdf } from "./document/session";
 import {
+  clampPitch,
   clampRate,
+  clampVolume,
   forgetPasscode,
   loadPasscode,
   loadSettings,
   RATE_STEP,
   savePasscode,
   saveSettings,
+  TALK_LEARNED_AFTER,
   type Mode,
   type Settings,
   THEME_NAMES,
@@ -31,8 +34,19 @@ import { Speaker, type Timers } from "./speech/speaker";
 import { pickVoice, voicesForLanguage } from "./speech/voices";
 import { safeStorage, type StorageLike } from "./storage";
 import { Store } from "./store";
-import { FRAMING, CuePolicy, FramingTracker, type Situation } from "./vision/framing";
+import { FRAMING, CuePolicy, FramingSounds, FramingTracker, type Situation } from "./vision/framing";
 import { CAMERA_MODE_LINES, MODES_HINT, modeAfterSwipe, type CameraMode, type SwipeDirection } from "./cameraModes";
+import {
+  echoQuestion,
+  HELP_LINE,
+  interpret,
+  NO_MICROPHONE,
+  NO_RECOGNITION,
+  NOTHING_HEARD,
+  unknownLine,
+  type Command,
+} from "./voice/commands";
+import { HOLD } from "./voice/hold";
 import { WakeLockManager } from "./wakeLock";
 
 export type Screen = "start" | "mode" | "passcode" | "camera" | "reading" | "ask" | "settings";
@@ -57,6 +71,12 @@ export interface UiState {
   cameraTitle: string;
   /** Which of the camera screen's modes is showing: the live camera, a PDF, or a photo. */
   cameraMode: CameraMode;
+  /** What the user asked for before the next photo ("the amount due"); sent with it. */
+  pendingQuestion: string | null;
+  /** Listening after a hold (or the camera's Talk button in VoiceOver mode). */
+  talking: boolean;
+  /** What has been heard so far while talking, shown on screen. */
+  heard: string;
   /** Screens move focus when this changes. */
   focus: { target: FocusTarget; seq: number };
   /** The browser has no speech engine: everything goes to the live region and a banner shows. */
@@ -88,7 +108,25 @@ export const FIRST_LAUNCH_QUESTION =
   "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no.";
 export const CAMERA_PERMISSION_LINE = "I need the camera to see the page. Tap Allow if your phone asks.";
 export const CAMERA_INTRO = "Camera ready.";
-
+/** Said after "Camera ready." until the user has talked to the app a few times (TALK_LEARNED_AFTER). */
+export const TALK_HINT = "Hold the screen and tell me what you want to know, or just take the picture.";
+/**
+ * Said on first use and from Settings (docs/PROMPT-2.md section 5). It speaks only for this app
+ * and its server; the owner adds a sentence about the reading service after checking its policy.
+ */
+export const PRIVACY_STATEMENT =
+  "This app saves nothing. Your photo is sent once to be read, then deleted from the phone. The words are kept only until you start a new document or close the app. Nothing is stored on the server.";
+/** After the answer to a question asked before the photo (docs/PROMPT-2.md section 3). */
+export const FOLLOW_UP_ANSWERED = "Hold the screen to ask something else, or press Play to hear everything.";
+/** After an answer that says the thing asked for is not on the photographed page. */
+export const FOLLOW_UP_NOT_FOUND = "Try the other side of the page, or press Play to hear everything.";
+/** After saying what the document is, when nothing was asked. */
+export const FOLLOW_UP_OVERVIEW = "What do you want to know? Hold the screen to ask, or press Play to hear everything.";
+/** Said once when an answer has not started within LET_ME_LOOK_MS (principle 6). */
+export const LET_ME_LOOK = "Let me look.";
+const LET_ME_LOOK_MS = 1500;
+/** Lines that "what did you say" skips: it repeats what came before them. */
+const NOT_REPEATED = new Set([FOLLOW_UP_ANSWERED, FOLLOW_UP_NOT_FOUND, FOLLOW_UP_OVERVIEW, ASK_AGAIN, LET_ME_LOOK, NOTHING_HEARD]);
 
 export interface ControllerEnv {
   port: SpeechPort;
@@ -158,6 +196,8 @@ export class AppController {
   private autoRetries = 0;
   private readonly cleanups: Array<() => void> = [];
   private answerSpeech: StreamingSpeech | null = null;
+  /** The last answer given, for "what did you say". */
+  private lastAnswer: string | null = null;
   private askAbort: AbortController | null = null;
   private readonly listener = new Listener();
   private nextTurnId = 1;
@@ -167,6 +207,18 @@ export class AppController {
   /** An answer interrupted by the page being hidden is spoken again on return. */
   private answerReplay: "none" | "onReturn" | "whenDone" = "none";
   private readonly tickers = new Map<string, unknown>();
+  /** Talking: "stopping" after the finger lifts, until the last words have been recognized. */
+  private talkState: "idle" | "listening" | "stopping" = "idle";
+  private talkTimer: unknown = null;
+  /** The reader was reading when the hold began (it pauses while the microphone listens). */
+  private talkWasReading = false;
+  /** "This phone can't hear me" is said once per session. */
+  private noRecognitionSaid = false;
+  /** The last thing said to the user, for "what did you say". */
+  private lastSaid: string | null = null;
+  /** A question asked while a page was still arriving: answered once all of it is here. */
+  private queuedQuestion: string | null = null;
+  private readonly framingSounds = new FramingSounds();
 
   constructor(env: ControllerEnv = browserEnv()) {
     this.env = env;
@@ -185,6 +237,9 @@ export class AppController {
       addingPage: null,
       cameraTitle: "Camera",
       cameraMode: "camera",
+      pendingQuestion: null,
+      talking: false,
+      heard: "",
       focus: { target: "heading", seq: 0 },
       speechUnavailable: false,
     });
@@ -193,6 +248,8 @@ export class AppController {
       timers: env.timers,
       defaultLang: UI_LANG,
       defaultRate: () => this.settings.get().rate,
+      pitch: () => this.settings.get().pitch,
+      volume: () => this.settings.get().volume,
       voiceFor: (lang) => pickVoice(env.port.getVoices(), lang, this.settings.get().voiceURI)?.voiceURI ?? null,
     });
     this.sounds = new Sounds(() => this.settings.get().sounds);
@@ -258,13 +315,15 @@ export class AppController {
   }
 
   say(text: string, opts?: AnnounceOptions): boolean {
-    return this.announcer.say(text, opts);
+    const said = this.announcer.say(text, opts);
+    if (said && !NOT_REPEATED.has(text)) this.lastSaid = text.trim();
+    return said;
   }
 
   private fail(message: string, detail?: string): void {
     this.sounds.error();
     this.ui.update({ errorText: detail ?? null });
-    this.announcer.say(message, { alert: true });
+    this.say(message, { alert: true });
     this.requestFocus("error");
   }
 
@@ -277,6 +336,7 @@ export class AppController {
     if (screen !== "camera" && from === "camera") this.ui.update({ capturing: false });
     // Whatever takes the user away from Ask (Back, or a failed page read) ends its work there.
     if (from === "ask" && screen !== "ask") this.teardownAsk();
+    if (screen !== from) this.dropTalk();
     this.ui.update({ screen, errorText: null, focus: { target: "heading", seq: this.ui.get().focus.seq + 1 } });
     // Keep the screen on while framing a page, listening to one, or hearing an answer.
     this.env.wakeLock?.setWanted(screen === "camera" || screen === "reading" || screen === "ask");
@@ -323,10 +383,10 @@ export class AppController {
     this.speaker.cancelAll();
     this.updateSettings({ mode });
     this.say(
-      mode === "voiceOver"
-        ? "VoiceOver mode. I'll stay quiet and let VoiceOver speak."
-        : "Read-aloud mode. I'll read everything to you.",
+      mode === "voiceOver" ? "VoiceOver mode. I'll stay quiet and let VoiceOver speak." : "Read-aloud mode. I'll speak to you.",
     );
+    // First use: say once what happens to her photos and documents.
+    this.say(PRIVACY_STATEMENT);
     this.continueAfterMode();
   }
 
@@ -466,6 +526,7 @@ export class AppController {
     // is often still in view: wait for the view to change. A retake means the same page again.
     this.tracker.requireChangeFrom(this.retakeTarget === null ? this.lastCaptureView : null);
     this.cuePolicy.reset();
+    this.framingSounds.reset();
     this.armed = true;
     this.torchTried = false;
     this.scheduleAnalysis(250);
@@ -500,7 +561,8 @@ export class AppController {
     this.analysisTimer = null;
     const camera = this.camera;
     if (!camera || this.ui.get().screen !== "camera") return;
-    if (this.ui.get().capturing || document.visibilityState !== "visible") {
+    // No picture while the user is talking: the question must go with it.
+    if (this.ui.get().capturing || this.talkState !== "idle" || document.visibilityState !== "visible") {
       this.scheduleAnalysis();
       return;
     }
@@ -509,6 +571,9 @@ export class AppController {
     if (frame) {
       const now = this.now();
       const situation = this.tracker.update(frame, now);
+      const sound = this.framingSounds.next(situation, this.tracker.lastAnalysis?.page.coverage ?? 0, now);
+      if (sound === "chime") this.sounds.framed();
+      else if (sound === "tick") this.sounds.framingTick();
       if (situation.kind === "ready" && this.armed && this.settings.get().autoCapture) {
         void this.autoCapture();
         return;
@@ -569,10 +634,15 @@ export class AppController {
     // A swipe to another mode while the camera was starting has already said where the user is.
     if (this.ui.get().cameraMode !== "camera") return;
     const page = this.ui.get().addingPage ?? this.session.nextPageNumber;
-    // Until the user has changed mode once, the app voice mentions the swipe. (VoiceOver users
-    // cannot swipe here: VoiceOver takes the gesture. They find the modes as tabs.)
-    const hint = this.channel() === "speech" && !this.settings.get().modesLearned;
-    if (intro === "full") this.say(hint ? `${CAMERA_INTRO} ${MODES_HINT}` : CAMERA_INTRO);
+    // Until the user has talked to the app a few times and changed mode once, the app voice
+    // mentions holding the screen and the swipe. (VoiceOver users can do neither here: VoiceOver
+    // takes the gestures. They have the Talk button and find the modes as tabs.)
+    const speech = this.channel() === "speech";
+    const settings = this.settings.get();
+    const lines = [CAMERA_INTRO];
+    if (speech && this.holdToTalk && settings.talkUses < TALK_LEARNED_AFTER) lines.push(TALK_HINT);
+    if (speech && !settings.modesLearned) lines.push(MODES_HINT);
+    if (intro === "full") this.say(lines.join(" "));
     else if (intro === "addPage") this.say(`Add page ${page}.`);
     else if (intro === "retake") this.say(`Retake page ${page}.`);
   }
@@ -662,7 +732,7 @@ export class AppController {
     const image = await prepareImage(source, width, height);
     if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) source.close();
     console.info("captured", { width: image.width, height: image.height, bytes: image.bytes, enhanced: image.enhanced });
-    this.say("Got it. Reading.");
+    this.say(gotItLine(this.ui.get().pendingQuestion));
     this.ui.update({ capturing: false });
     this.startPageRead({ image });
   }
@@ -696,7 +766,8 @@ export class AppController {
       return;
     }
     console.info("pdf opened", { bytes: pdf.bytes });
-    this.say("Got it. Reading the PDF.");
+    const asked = this.ui.get().pendingQuestion;
+    this.say(asked ? gotItLine(asked) : "Got it. Reading the PDF.");
     this.ui.update({ capturing: false });
     this.startPageRead({ pdf });
   }
@@ -722,16 +793,18 @@ export class AppController {
     this.reader.setLoading(true);
     this.navigate("reading");
     this.requestFocus("heading");
-    if (this.appVoiceActive) {
-      if (adding) this.reader.continueAfterAddPage(pageNumber);
-      else this.reader.play();
-    } else {
-      this.startLoadingTicker();
-    }
+    // Answer first (docs/PROMPT-2.md section 3): nothing is read aloud until the answer, or what
+    // the document is, has been said, and the whole text only when the user presses Play. Soft
+    // ticks fill the wait.
+    this.stopAnswer();
+    this.startLoadingTicker();
 
     const isPdf = "pdf" in source;
-    const callbacks = this.pageReadCallbacks(adding, pageNumber, isPdf);
-    const read = (isPdf ? this.session.readPdf(source.pdf, callbacks) : this.session.readPage(source.image, callbacks)).then(
+    const question = this.ui.get().pendingQuestion;
+    const callbacks = this.pageReadCallbacks(adding, pageNumber, isPdf, question);
+    const read = (
+      isPdf ? this.session.readPdf(source.pdf, callbacks, question) : this.session.readPage(source.image, callbacks, question)
+    ).then(
       (outcome) => {
         // A PDF read to the end in VoiceOver mode: say once that every page is there.
         const pages = this.session.doc?.pages.filter((p) => p.fromPdf && p.number >= pageNumber).length ?? 0;
@@ -739,12 +812,30 @@ export class AppController {
       },
     );
     // The session counts a read as finished only after its stream closes; then the reader knows
-    // no more text is coming and can announce the end of the document.
-    void read.then(() => this.reader.setLoading(this.session.isReading));
+    // no more text is coming and can announce the end of the document, and a question asked
+    // while the page was arriving can be answered from all of it.
+    void read.then(() => {
+      this.reader.setLoading(this.session.isReading);
+      const queued = this.queuedQuestion;
+      if (queued && !this.session.isReading) {
+        this.queuedQuestion = null;
+        this.stopTicker("answer");
+        if (this.session.doc?.pages.length) this.askAboutDocument(queued, { looked: true });
+      }
+    });
   }
 
   /** What happens as a page read (or a PDF read, page by page) streams in. */
-  private pageReadCallbacks(adding: boolean, pageNumber: number, isPdf: boolean): PageReadCallbacks {
+  private pageReadCallbacks(adding: boolean, pageNumber: number, isPdf: boolean, question: string | null): PageReadCallbacks {
+    // The answer (or what the document is) is said once, for the first page of this read.
+    let answered = false;
+    let firstMeta: MetaEvent | null = null;
+    const answeredNow = () => {
+      if (answered) return false;
+      answered = true;
+      this.stopLoadingTicker();
+      return true;
+    };
     return {
       onRetry: (problem) => {
         this.stopLoadingTicker();
@@ -759,19 +850,30 @@ export class AppController {
       },
       onPageStart: (page, meta) => {
         this.autoRetries = 0;
-        this.stopLoadingTicker();
         this.sounds.pageFound();
         this.reader.beginPage(page.number, { title: meta.title, language: meta.language });
-        // In VoiceOver mode only the first page of a PDF is announced as it starts; each later
-        // page gets a short "Page N ready." when it is complete.
-        const laterPdfPage = page.fromPdf && page.number > pageNumber;
-        if (!this.appVoiceActive && !laterPdfPage) this.say(liveTitleAnnouncement(page, meta));
+        if (adding && page.number === pageNumber) this.reader.queueAddedPage(page.number);
+        if (page.number === pageNumber) {
+          firstMeta = meta;
+          // The question has been sent with a photo that could be read: it is used up.
+          if (question) this.ui.update({ pendingQuestion: null });
+        }
+      },
+      onAnswer: (page, text) => {
+        if (page.number !== pageNumber || !answeredNow()) return;
+        this.speakAnswer(text, question, isPdf);
       },
       onBlock: (page, index, block) => {
+        // The model left out the answer line: in VoiceOver mode say what the page is, as before,
+        // as soon as its text starts.
+        if (page.number === pageNumber && !this.appVoiceActive && firstMeta && answeredNow()) {
+          this.say(liveTitleAnnouncement(page, firstMeta));
+        }
         this.reader.addBlock(page.number, index, block.kind, block.text);
       },
       onPageDone: (page) => {
         this.reader.completePage(page.number);
+        if (page.number === pageNumber && answeredNow()) this.answerFallback(page, question);
         this.announcePageDone(page, page.fromPdf === true && page.number > pageNumber);
       },
       onError: (code, message, page) => {
@@ -799,6 +901,56 @@ export class AppController {
         void this.openCamera({ addPage: adding ? pageNumber : null, intro: "none" });
       },
     };
+  }
+
+  /**
+   * The short answer before the text: to the question asked before the photo, or, with none, what
+   * the document is. Said once, then the app waits: the whole text only when the user asks.
+   */
+  private speakAnswer(text: string, question: string | null, isPdf: boolean): void {
+    if (question) this.recordAnswer(question, text);
+    this.lastAnswer = text;
+    this.lastSaid = text;
+    if (!this.appVoiceActive) {
+      // VoiceOver reads the text as written; "Page 1 ready." follows when the page is complete.
+      this.say(text);
+      return;
+    }
+    this.stopAnswer();
+    // Not on a photographed page: it may be on the back (a PDF has all its pages already).
+    const notFound = question !== null && !isPdf && /^I can't find\b/.test(text);
+    const followUp = !question ? FOLLOW_UP_OVERVIEW : notFound ? FOLLOW_UP_NOT_FOUND : FOLLOW_UP_ANSWERED;
+    const speech = new StreamingSpeech(this.speaker, {
+      lang: UI_LANG,
+      rate: () => this.settings.get().rate,
+      onDone: () => {
+        if (this.answerSpeech === speech) this.say(followUp);
+      },
+    });
+    this.answerSpeech = speech;
+    speech.push(text);
+    speech.finish();
+  }
+
+  /**
+   * The model left out the answer line. A question is answered from the page's text instead;
+   * otherwise the title says what the document is.
+   */
+  private answerFallback(page: DocPage, question: string | null): void {
+    if (question && page.blocks.length > 0) {
+      this.askAboutDocument(question);
+      return;
+    }
+    const title = sentence(page.title);
+    if (!title || page.blocks.length === 0) return; // "I couldn't find any text" is said instead
+    if (this.appVoiceActive) this.say(`${title} ${FOLLOW_UP_OVERVIEW}`);
+    else this.say(title);
+  }
+
+  /** Keeps an answer given at capture with the questions, so follow-up questions have context. */
+  private recordAnswer(question: string, answer: string): void {
+    const turn: AskTurn = { id: this.nextTurnId++, question, answer, status: "done" };
+    this.ask.update({ turns: [...this.ask.get().turns, turn] });
   }
 
   /**
@@ -867,7 +1019,7 @@ export class AppController {
     const title = sentence(doc.title);
     this.say(
       this.appVoiceActive
-        ? `Your document is still here: ${title} Press Play to hear it, or New document to start again.`
+        ? `Your document is still here: ${title} Press Play to hear it, hold the screen to ask about it, or press New document to start again.`
         : `Your document is still here: ${title} Swipe right to read it, or find New document to start again.`,
     );
   }
@@ -877,8 +1029,31 @@ export class AppController {
   // -------------------------------------------------------------------------
 
   togglePlay(): void {
+    // Play stops the answer (and its follow-up line) and starts the full text.
+    if (!this.reader.isActive) {
+      this.stopAnswer();
+      this.speaker.cancelAll();
+    }
     this.reader.toggle();
   }
+
+  /** "Read everything": the whole document from its first line. */
+  readEverything(opts: { echo?: string } = {}): void {
+    if (!this.session.doc?.pages.length) {
+      this.say(this.nothingToReadLine());
+      return;
+    }
+    this.stopAnswer();
+    this.speaker.cancelAll();
+    if (this.ui.get().screen !== "reading") this.backToReading({ quiet: true });
+    if (opts.echo) this.say(opts.echo);
+    this.reader.readFromStart();
+  }
+
+  private nothingToReadLine(): string {
+    return this.session.awaitingFirstLine ? "Wait a moment, I'm still reading the page." : "There's nothing to read yet. Take a picture first.";
+  }
+
   back(): void {
     this.reader.previous();
   }
@@ -924,12 +1099,13 @@ export class AppController {
 
   /**
    * Clears the document. When there is one, the first press only explains; a second press within
-   * six seconds clears it, so a stray tap never throws a document away.
+   * six seconds clears it, so a stray tap never throws a document away. Saying "new document" is
+   * never a stray tap, so it clears at once (`confirmed`).
    */
-  newDocument(): void {
+  newDocument(opts: { confirmed?: boolean } = {}): void {
     const hasDoc = (this.session.doc?.pages.length ?? 0) > 0;
     const now = this.now();
-    if (hasDoc && now > this.newDocumentArmedUntil) {
+    if (hasDoc && !opts.confirmed && now > this.newDocumentArmedUntil) {
       this.newDocumentArmedUntil = now + 6000;
       this.notify("Press New document again to clear this document and start a new one.");
       return;
@@ -939,6 +1115,9 @@ export class AppController {
     this.autoRetries = 0;
     this.teardownAsk();
     this.ask.update({ turns: [], busy: false });
+    this.ui.update({ pendingQuestion: null });
+    this.lastAnswer = null;
+    this.queuedQuestion = null;
     this.reader.reset();
     this.session.newDocument();
     this.stopLoadingTicker();
@@ -992,11 +1171,12 @@ export class AppController {
   }
 
   /** From the camera (while adding or retaking a page), Ask, or Settings. */
-  backToReading(): void {
+  backToReading(opts: { quiet?: boolean } = {}): void {
     this.retakeTarget = null;
     this.ui.update({ addingPage: null });
     this.navigate("reading");
-    this.afterReturnToReading();
+    if (opts.quiet) this.resumeOnReturn = false;
+    else this.afterReturnToReading();
   }
 
   private afterReturnToReading(): void {
@@ -1065,7 +1245,10 @@ export class AppController {
   /**
    * Sends a question. Returns false when it was not accepted, so the screen keeps what was typed.
    */
-  submitQuestion(input: string, opts: { spoken?: boolean } = {}): boolean {
+  submitQuestion(
+    input: string,
+    opts: { spoken?: boolean; echoed?: boolean; followUp?: string; looked?: boolean } = {},
+  ): boolean {
     const question = input.trim();
     if (!question) {
       this.say("Type or say a question first.");
@@ -1088,11 +1271,42 @@ export class AppController {
     }
     // Send pressed while the microphone was still open: the question in the box is the one sent.
     if (!opts.spoken) this.stopListening(true);
-    void this.runQuestion(question, doc, passcode, opts.spoken === true);
+    void this.runQuestion(question, doc, passcode, {
+      spoken: opts.spoken === true && !opts.echoed,
+      followUp: opts.followUp ?? ASK_AGAIN,
+      looked: opts.looked === true,
+    });
     return true;
   }
 
-  private async runQuestion(question: string, doc: Doc, passcode: string, spoken: boolean): Promise<void> {
+  /**
+   * A question held and spoken on the reading screen (or the answer the model left out at
+   * capture): answered from the whole document, then FOLLOW_UP_ANSWERED.
+   */
+  askAboutDocument(question: string, opts: { looked?: boolean } = {}): void {
+    if (this.session.isReading) {
+      // The page is still arriving: answer from all of it once it is here (see startPageRead).
+      this.queuedQuestion = question;
+      this.startTicker("answer");
+      this.env.timers.setTimeout(() => {
+        if (this.queuedQuestion === question) this.say(LET_ME_LOOK);
+      }, LET_ME_LOOK_MS);
+      return;
+    }
+    this.submitQuestion(question, {
+      spoken: true,
+      echoed: true,
+      followUp: this.appVoiceActive ? FOLLOW_UP_ANSWERED : "",
+      looked: opts.looked,
+    });
+  }
+
+  private async runQuestion(
+    question: string,
+    doc: Doc,
+    passcode: string,
+    { spoken, followUp, looked }: { spoken: boolean; followUp: string; looked: boolean },
+  ): Promise<void> {
     this.stopAnswer();
     this.answerReplay = "none";
     // The last five questions and answers keep the request small. Failed and empty answers are
@@ -1113,7 +1327,9 @@ export class AppController {
       ? new StreamingSpeech(this.speaker, {
           lang: UI_LANG,
           rate: () => this.settings.get().rate,
-          onDone: () => this.say(ASK_AGAIN),
+          onDone: () => {
+            if (followUp) this.say(followUp);
+          },
         })
       : null;
     this.answerSpeech = speech;
@@ -1127,6 +1343,11 @@ export class AppController {
     const abort = new AbortController();
     this.askAbort = abort;
     this.startTicker("answer");
+    // A careful answer can take a moment: say so rather than stay silent (once per question).
+    let started = false;
+    const letMeLook = this.env.timers.setTimeout(() => {
+      if (!started && !looked && this.askAbort === abort) this.say(LET_ME_LOOK);
+    }, LET_ME_LOOK_MS);
     try {
       await this.env.api.ask(
         { pages: docToAskPages(doc), title: doc.title, history, question },
@@ -1134,6 +1355,7 @@ export class AppController {
         (event) => {
           if (abort.signal.aborted) return;
           if (event.type === "text") {
+            started = true;
             this.stopTicker("answer");
             update({ answer: turn.answer + event.text });
             if (speech && this.answerSpeech === speech) speech.push(event.text);
@@ -1147,8 +1369,10 @@ export class AppController {
             } else if (speech && this.answerSpeech === speech) {
               speech.finish();
             } else if (!speech) {
-              this.say(`Answer: ${turn.answer.trim()} ${ASK_AGAIN}`);
+              this.say(`Answer: ${turn.answer.trim()} ${followUp}`.trim());
             }
+            this.lastAnswer = turn.answer.trim();
+            this.lastSaid = this.lastAnswer;
           } else {
             update({ status: "error", error: event.message });
             speech?.stop();
@@ -1171,6 +1395,7 @@ export class AppController {
     } finally {
       // Only the current question tidies up; one that was stopped earlier must not touch the
       // ticker or busy state of a question asked after it.
+      this.env.timers.clearTimeout(letMeLook);
       if (this.askAbort === abort) {
         this.stopTicker("answer");
         this.askAbort = null;
@@ -1181,6 +1406,7 @@ export class AppController {
 
   /** The Talk button: starts listening, or stops and sends what was heard. */
   toggleListening(): void {
+    this.dropTalk();
     if (this.ask.get().listening) {
       this.stopListening(false);
       return;
@@ -1229,6 +1455,230 @@ export class AppController {
   }
 
   // -------------------------------------------------------------------------
+  // Hold to talk (docs/PROMPT-2.md section 4)
+  // -------------------------------------------------------------------------
+
+  /** Holding the screen to talk is for read-aloud mode: VoiceOver takes touches for itself. */
+  get holdToTalk(): boolean {
+    return this.settings.get().mode === "readAloud";
+  }
+
+  /**
+   * A hold has lasted 400 ms, or the camera's Talk button was pressed: stop speaking, play the
+   * rising tone, and listen. Returns false when listening could not start (and says why).
+   */
+  startTalk(): boolean {
+    if (this.talkState !== "idle") return true;
+    if (!recognitionAvailable()) {
+      if (!this.noRecognitionSaid) {
+        this.noRecognitionSaid = true;
+        this.say(NO_RECOGNITION);
+      }
+      return false;
+    }
+    // The app must not talk while the microphone listens: whatever it was saying stops, and an
+    // answer still arriving is dropped (the user is about to ask something else).
+    this.talkWasReading = this.reader.isActive;
+    if (this.talkWasReading) this.reader.pause({ silent: true });
+    if (this.askAbort) this.teardownAsk();
+    this.stopListening(true);
+    this.stopAnswer();
+    this.speaker.cancelAll();
+    const lang = this.voiceLanguage().startsWith("en") ? "en-US" : this.voiceLanguage();
+    const started = this.listener.start(lang, {
+      onText: (text) => this.ui.update({ heard: text }),
+      onEnd: (text, error) => this.talkEnded(text, error),
+    });
+    if (!started) {
+      this.say(NO_MICROPHONE);
+      return false;
+    }
+    this.talkState = "listening";
+    this.ui.update({ talking: true, heard: "" });
+    this.sounds.listenStart();
+    // The hold gesture stops after 8 seconds by itself; this covers the Talk button too.
+    this.talkTimer = this.env.timers.setTimeout(() => this.endTalk(), HOLD.maxMs);
+    return true;
+  }
+
+  /** The finger lifted (or time ran out): the falling tone, then what was heard is acted on. */
+  endTalk(): void {
+    if (this.talkState !== "listening") return;
+    this.talkState = "stopping";
+    this.clearTalkTimer();
+    this.sounds.listenEnd();
+    this.listener.stop();
+  }
+
+  /** The finger slid away: what was heard is dropped. */
+  cancelTalk(): void {
+    if (this.talkState === "idle") return;
+    const wasReading = this.talkWasReading;
+    this.dropTalk();
+    this.sounds.listenEnd();
+    // Reading carries on as if nothing happened; otherwise say that nothing will happen.
+    if (wasReading && this.ui.get().screen === "reading") this.reader.resume();
+    else this.say("Cancelled.");
+  }
+
+  /** The camera's Talk button in VoiceOver mode: press to talk, press again when done. */
+  toggleTalk(): void {
+    if (this.talkState === "listening") this.endTalk();
+    else if (this.talkState === "idle") this.startTalk();
+  }
+
+  /** Stops listening without a word (leaving the screen, or the Ask screen's Talk button). */
+  private dropTalk(): void {
+    if (this.talkState === "idle") return;
+    this.talkState = "idle";
+    this.talkWasReading = false;
+    this.clearTalkTimer();
+    this.listener.abort();
+    this.ui.update({ talking: false, heard: "" });
+  }
+
+  private clearTalkTimer(): void {
+    if (this.talkTimer !== null) {
+      this.env.timers.clearTimeout(this.talkTimer);
+      this.talkTimer = null;
+    }
+  }
+
+  private talkEnded(text: string, error: string | null): void {
+    const wasReading = this.talkWasReading;
+    this.talkState = "idle";
+    this.talkWasReading = false;
+    this.clearTalkTimer();
+    this.ui.update({ talking: false, heard: "" });
+    if (!text) {
+      this.say(error === "not-allowed" || error === "service-not-allowed" ? NO_MICROPHONE : NOTHING_HEARD);
+      return;
+    }
+    const uses = this.settings.get().talkUses;
+    if (uses < TALK_LEARNED_AFTER) this.updateSettings({ talkUses: uses + 1 });
+    const heard = interpret(text);
+    if (heard.kind === "command") this.runCommand(heard.command, wasReading);
+    else if (heard.kind === "unknown") this.say(unknownLine(text));
+    else this.askBySpeech(heard.text);
+  }
+
+  /**
+   * Something to find on the page. On the camera it is kept for the next photo and said back in
+   * a few words ("Amount due."); on the reading and Ask screens it is answered from the document.
+   */
+  private askBySpeech(question: string): void {
+    const screen = this.ui.get().screen === "settings" ? this.leaveSettingsQuietly() : this.ui.get().screen;
+    const echo = echoQuestion(question);
+    if (screen === "camera") {
+      this.ui.update({ pendingQuestion: question });
+      this.say(echo);
+      return;
+    }
+    if (!this.session.doc?.pages.length) {
+      this.say(
+        this.session.awaitingFirstLine
+          ? "Wait a moment, I'm still reading the page. Then ask again."
+          : "Read a page first, then you can ask about it.",
+      );
+      return;
+    }
+    this.say(echo);
+    if (screen === "ask") this.submitQuestion(question, { spoken: true, echoed: true });
+    else this.askAboutDocument(question);
+  }
+
+  /** Back to the screen Settings was opened from, without the usual "Back to reading" line. */
+  private leaveSettingsQuietly(): Screen {
+    const to = this.ui.get().returnTo;
+    this.navigate(to);
+    this.resumeOnReturn = false;
+    if (to === "camera") this.cameraIntroPending = "none";
+    return to;
+  }
+
+  private runCommand(command: Command, wasReading: boolean): void {
+    switch (command) {
+      case "help":
+        this.say(HELP_LINE);
+        return;
+      case "repeat":
+        // While reading, the sentence the hold interrupted is read again.
+        if (wasReading) this.reader.resume();
+        else this.say(this.lastSaid ?? "I haven't said anything yet.");
+        return;
+      case "settings":
+        this.say("Settings.");
+        this.openSettings();
+        return;
+      case "newDocument":
+        this.newDocument({ confirmed: true });
+        return;
+      case "addPage":
+        this.addPage();
+        return;
+      case "capture":
+        this.captureBySpeech();
+        return;
+      default:
+        break;
+    }
+    // The rest work the reader, on the reading screen.
+    if (!this.session.doc?.pages.length) {
+      this.say(this.nothingToReadLine());
+      return;
+    }
+    if (command === "readEverything") {
+      this.readEverything({ echo: "Reading everything." });
+      return;
+    }
+    if (this.ui.get().screen !== "reading") this.backToReading({ quiet: true });
+    switch (command) {
+      case "play":
+        if (!this.reader.isActive) this.togglePlay();
+        return;
+      case "pause":
+        // The hold has already paused the reading.
+        this.say(wasReading ? this.reader.positionReport("Paused") : "Stopped.");
+        return;
+      case "next":
+        this.forward();
+        return;
+      case "back":
+        this.back();
+        return;
+      case "nextParagraph":
+        this.nextParagraph();
+        return;
+      case "previousParagraph":
+        this.previousParagraph();
+        return;
+      case "spell":
+        this.spell();
+        return;
+      case "faster":
+      case "slower":
+        this.changeRate(command === "faster" ? RATE_STEP : -RATE_STEP);
+        // Reading carries on at the new speed after it is said.
+        if (wasReading) this.reader.play();
+        return;
+    }
+  }
+
+  /** "Take a picture": the Capture button, on the camera. */
+  private captureBySpeech(): void {
+    const ui = this.ui.get();
+    if (ui.screen !== "camera") {
+      this.say("To take a picture, say new document, or add a page.");
+      return;
+    }
+    if (ui.cameraMode !== "camera") {
+      this.ui.update({ cameraMode: "camera" });
+      if (this.camera) this.startGuidance();
+    }
+    void this.captureManual();
+  }
+
+  // -------------------------------------------------------------------------
   // Settings screen
   // -------------------------------------------------------------------------
 
@@ -1250,6 +1700,8 @@ export class AppController {
   updateSettings(patch: Partial<Settings>): void {
     const next = { ...this.settings.get(), ...patch };
     next.rate = clampRate(next.rate);
+    next.pitch = clampPitch(next.pitch);
+    next.volume = clampVolume(next.volume);
     this.settings.set(next);
     saveSettings(this.env.local, next);
   }
@@ -1262,7 +1714,7 @@ export class AppController {
     this.say(
       mode === "voiceOver"
         ? "VoiceOver mode. I'll stay quiet and let VoiceOver speak."
-        : "Read-aloud mode. I'll read everything to you.",
+        : "Read-aloud mode. I'll speak to you.",
     );
   }
 
@@ -1305,6 +1757,31 @@ export class AppController {
     const text = `Speed ${next.toFixed(1)}.`;
     if (source === "slider") this.sayUnlessVoiceOver(text);
     else this.say(text);
+  }
+
+  /** Tone is the voice's pitch, 0.8 to 1.2 (docs/PROMPT-2.md section 6). */
+  setPitch(pitch: number, source: "slider" | "button" = "slider"): void {
+    const next = clampPitch(pitch);
+    if (next === this.settings.get().pitch) return;
+    this.updateSettings({ pitch: next });
+    const text = `Tone ${next.toFixed(1)}.`;
+    if (source === "slider") this.sayUnlessVoiceOver(text);
+    else this.say(text);
+  }
+
+  /** Volume 0.5 to 1.0, said as "Volume 5." to "Volume 10.". The phone's buttons still work. */
+  setVolume(volume: number, source: "slider" | "button" = "slider"): void {
+    const next = clampVolume(volume);
+    if (next === this.settings.get().volume) return;
+    this.updateSettings({ volume: next });
+    const text = `Volume ${Math.round(next * 10)}.`;
+    if (source === "slider") this.sayUnlessVoiceOver(text);
+    else this.say(text);
+  }
+
+  /** The Privacy row in Settings. VoiceOver reads the row's text itself. */
+  sayPrivacy(): void {
+    this.sayUnlessVoiceOver(PRIVACY_STATEMENT);
   }
 
   setAutoCapture(on: boolean): void {
@@ -1378,6 +1855,19 @@ export class AppController {
 
 function baseLang(tag: string): string {
   return tag.toLowerCase().split(/[-_]/)[0] ?? tag;
+}
+
+/**
+ * Said with the shutter: "Got it. Looking for the amount due." when something was asked before
+ * the photo, "Got it. Reading." when not. A question worded as a question is not repeated.
+ */
+export function gotItLine(question: string | null): string {
+  if (!question) return "Got it. Reading.";
+  const asked = question.trim().replace(/[?.!]+$/, "");
+  if (/^(what|what's|whats|when|who|whose|how|where|which|why|is|are|does|do|did|can|could|should|was|were|will|tell)\b/i.test(asked)) {
+    return "Got it. Looking for the answer.";
+  }
+  return `Got it. Looking for ${asked}.`;
 }
 
 /** Ends a title with a full stop so the next sentence does not run into it when spoken. */

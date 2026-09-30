@@ -11,6 +11,10 @@ export interface UtteranceRequest {
   text: string;
   lang: string;
   rate: number;
+  /** 0.8 to 1.2 ("Tone" in Settings). */
+  pitch: number;
+  /** 0.5 to 1.0, below the phone's own volume. */
+  volume: number;
   voiceURI: string | null;
   onStart(): void;
   onEnd(): void;
@@ -70,6 +74,8 @@ export class BrowserSpeechPort implements SpeechPort {
     const utterance = new SpeechSynthesisUtterance(request.text);
     utterance.lang = request.lang;
     utterance.rate = request.rate;
+    utterance.pitch = request.pitch;
+    utterance.volume = request.volume;
     const voice = request.voiceURI ? this.findVoice(request.voiceURI) : undefined;
     if (voice) utterance.voice = voice;
     utterance.onstart = () => request.onStart();

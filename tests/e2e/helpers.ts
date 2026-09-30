@@ -13,6 +13,10 @@ export interface SeedSettings {
   theme?: "light" | "dark" | "contrast";
   /** False to hear the first-run swipe hint on the camera screen. */
   modesLearned?: boolean;
+  /** Below 3 to hear the hold-to-talk hint on the camera screen. */
+  talkUses?: number;
+  pitch?: number;
+  volume?: number;
 }
 
 /**
@@ -73,7 +77,17 @@ export async function openApp(page: Page, opts: { settings?: SeedSettings; passc
   await page.addInitScript(recordAnnouncements);
   if (opts.settings || opts.passcode) {
     const settings = opts.settings
-      ? { mode: null, rate: 1, voiceURI: null, autoCapture: true, guidance: "full", sounds: true, modesLearned: true, ...opts.settings }
+      ? {
+          mode: null,
+          rate: 1,
+          voiceURI: null,
+          autoCapture: true,
+          guidance: "full",
+          sounds: true,
+          modesLearned: true,
+          talkUses: 3,
+          ...opts.settings,
+        }
       : null;
     await page.addInitScript(
       ([seed, passcode]) => {
@@ -132,6 +146,14 @@ export async function openToCamera(page: Page, mode: "readAloud" | "voiceOver" =
 export async function captureAndRead(page: Page) {
   await page.getByRole("button", { name: "Capture" }).click();
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
+}
+
+/**
+ * Presses Play on the reading screen. After a capture the app only says what the document is
+ * (docs/PROMPT-2.md section 3); the text is read when the user asks for it.
+ */
+export async function pressPlay(page: Page) {
+  await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Play" }).click();
 }
 
 /** Runs axe on the current screen and fails with a readable list of violations. */

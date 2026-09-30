@@ -18,12 +18,14 @@ import { ReaderControls } from "../ReaderControls";
 import { ReadingTopBar, type MenuEntry } from "../ReadingTopBar";
 import { Transcript } from "../Transcript";
 import { Button } from "../ui";
+import { HOLD_CLASSES, holdProps, useHoldToTalk } from "../useHoldToTalk";
 
 /**
  * Screen 2. The document as real text, with the controls floating on glass: New document and
  * More at the top, and in read-aloud mode (or after "Play with app voice") the player at the
  * bottom. In VoiceOver mode VoiceOver reads the text at the user's own pace and the buttons sit
- * below the transcript.
+ * below the transcript. In read-aloud mode, holding anywhere on the screen asks a question or
+ * gives a command.
  */
 export function ReadingScreen() {
   const controller = useController();
@@ -36,6 +38,7 @@ export function ReadingScreen() {
   useFocusRequest(headingRef, "heading");
   useFocusRequest(headingRef, "transcript");
   useFocusRequest(errorRef, "error");
+  const hold = useHoldToTalk();
 
   const appVoice = settings.mode !== "voiceOver" || ui.docAppVoice;
   const doc = session.doc;
@@ -75,7 +78,7 @@ export function ReadingScreen() {
     : pageEntries;
 
   return (
-    <main className="flex min-h-dvh flex-col bg-ink text-text">
+    <main {...holdProps(hold)} className={`flex min-h-dvh flex-col bg-ink text-text ${hold ? HOLD_CLASSES : ""}`}>
       <ReadingTopBar entries={entries} />
       <div className="flex-1 px-5 pb-8">
         <header className="mb-8">

@@ -144,18 +144,75 @@ const PDF_DOCUMENT = [
   { type: "done", blocks: 5 },
 ];
 
-function pdfScript(): FakeScript {
-  const lines = PDF_DOCUMENT.map((line) => JSON.stringify(line)).join("\n");
+/** "the account number" stays as it is; "account number" becomes "the account number". */
+function withArticle(thing: string): string {
+  const cleaned = thing.trim().replace(/[?.!]+$/, "");
+  return /^(the|a|an|my|your|any)\s/i.test(cleaned) ? cleaned : `the ${cleaned}`;
+}
+
+type Answers = { overview: string; answers: Array<[RegExp, string]>; notFoundIn: string };
+
+const PAGE_ONE_ANSWERS: Answers = {
+  overview: "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026.",
+  answers: [
+    [/what('s| is) (this|it)\b|what kind/i, "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026."],
+    [/due date|when/i, "It is due on October 28, 2026."],
+    [/amount|owe|how much|total|pay/i, "The amount due is $84.12, due October 28, 2026."],
+    [/who|from/i, "It is from Riverside Water Utility."],
+    [/phone|call/i, "The phone number is possibly 555-0142; part of it is hard to read."],
+  ],
+  notFoundIn: "on this page",
+};
+
+const PAGE_TWO_ANSWERS: Answers = {
+  overview: "This is the second page of the water bill. It lists the ways to pay.",
+  answers: [[/pay|how/i, "You can pay online at riverside water dot example, or by mail with the slip below."]],
+  notFoundIn: "on this page",
+};
+
+const PDF_ANSWERS: Answers = {
+  overview: "This is a two-page letter from Riverside Library about a returned book. It asks you to pay a late fee of $2.40.",
+  answers: [
+    [/fee|owe|amount|how much|pay/i, "The late fee is $2.40. You can pay at the front desk or by phone at 555-0199."],
+    [/who|from/i, "It is from Riverside Library."],
+  ],
+  notFoundIn: "in this document",
+};
+
+/** The answer line the real model writes after the meta line (docs/PROMPT-2.md section 3). */
+function answerLine(answers: Answers, question: string | null): string {
+  if (!question) return JSON.stringify({ type: "answer", text: answers.overview });
+  const found = answers.answers.find(([pattern]) => pattern.test(question));
+  const text = found ? found[1] : `I can't find ${withArticle(question)} ${answers.notFoundIn}.`;
+  return JSON.stringify({ type: "answer", text });
+}
+
+/** The meta line, then the answer line, then the rest of the page. */
+function withAnswer(lines: object[], answers: Answers, question: string | null): string {
+  const [meta, ...rest] = lines.map((line) => JSON.stringify(line));
+  return [meta, answerLine(answers, question), ...rest].join("\n");
+}
+
+/** The question the phone sent, from the instruction text (see readUserText in prompts.ts). */
+function askedIn(instruction: string): string | null {
+  return /listener asked: "([^"]*)"/.exec(instruction)?.[1] ?? null;
+}
+
+function pdfScript(question: string | null): FakeScript {
+  const lines = withAnswer(PDF_DOCUMENT, PDF_ANSWERS, question);
   return { chunks: chunkText(`${lines}\n`), delayMs: 25, usage: { input_tokens: 6100, output_tokens: 260 } };
 }
 
-function readScript(pageNumber: number): FakeScript {
-  const lines = (pageNumber % 2 === 1 ? PAGE_ONE : PAGE_TWO).map((line) => JSON.stringify(line)).join("\n");
+function readScript(pageNumber: number, question: string | null): FakeScript {
+  const odd = pageNumber % 2 === 1;
+  const lines = withAnswer(odd ? PAGE_ONE : PAGE_TWO, odd ? PAGE_ONE_ANSWERS : PAGE_TWO_ANSWERS, question);
   return { chunks: chunkText(`${lines}\n`), delayMs: 25, usage: { input_tokens: 4300, output_tokens: 320 } };
 }
 
 function askScript(question: string): FakeScript {
-  const answer = /due|when|owe|amount|how much/i.test(question)
+  const answer = /account/i.test(question)
+    ? "I can't find the account number in this document."
+    : /due|when|owe|amount|how much/i.test(question)
     ? "You owe 84 dollars and 12 cents, and it is due on October 28, 2026."
     : /phone|call|number/i.test(question)
       ? "The phone number is 555-0142, and they answer between 8 in the morning and 5 in the afternoon."
@@ -168,15 +225,15 @@ export function createFakeModelClient(): ModelClient {
     stream(params: StreamParams, options?: { signal?: AbortSignal }): ModelStream {
       const first = params.messages[0];
       const content = Array.isArray(first?.content) ? first.content : [];
+      const text = content.find((part) => part.type === "text");
+      const instruction = text && text.type === "text" ? text.text : "";
       if (content.some((part) => part.type === "document")) {
-        return new FakeModelStream(pdfScript(), options?.signal, params.model);
+        return new FakeModelStream(pdfScript(askedIn(instruction)), options?.signal, params.model);
       }
       const hasImage = content.some((part) => part.type === "image");
       if (hasImage) {
-        const text = content.find((part) => part.type === "text");
-        const pageText = text && text.type === "text" ? text.text : "";
-        const pageNumber = Number(/Page (\d+)/.exec(pageText)?.[1] ?? "1");
-        return new FakeModelStream(readScript(pageNumber), options?.signal, params.model);
+        const pageNumber = Number(/Page (\d+)/.exec(instruction)?.[1] ?? "1");
+        return new FakeModelStream(readScript(pageNumber, askedIn(instruction)), options?.signal, params.model);
       }
       const last = params.messages[params.messages.length - 1];
       const question = typeof last?.content === "string" ? last.content : "";

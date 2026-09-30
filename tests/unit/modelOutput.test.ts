@@ -35,6 +35,20 @@ describe("ModelOutputParser", () => {
     expect(events[0]).toMatchObject({ status: "ok", title: "A letter from the bank", language: "en" });
   });
 
+  it("passes one answer line through after the meta line, before the text", () => {
+    const answer = { type: "answer", text: "The amount due is $84.12, due October 28." };
+    const events = run(ndjson(META, answer, B1, { type: "answer", text: "A second answer." }, B2));
+    expect(events.map((e) => e.type)).toEqual(["meta", "answer", "block", "block", "done"]);
+    expect(events[1]).toEqual(answer);
+  });
+
+  it("drops an answer before the meta line, an empty one, and one for a page that could not be read", () => {
+    expect(run(ndjson({ type: "answer", text: "Too early." }, META, B1)).map((e) => e.type)).toEqual(["meta", "block", "done"]);
+    expect(run(ndjson(META, { type: "answer", text: "   " }, B1)).map((e) => e.type)).toEqual(["meta", "block", "done"]);
+    const retry = { ...META, status: "retry", problem: "It is too dark." };
+    expect(run(ndjson(retry, { type: "answer", text: "Nothing." })).map((e) => e.type)).toEqual(["meta", "done"]);
+  });
+
   it("emits the first block before the stream finishes", () => {
     const parser = new ModelOutputParser();
     const early = parser.push(ndjson(META, B1));

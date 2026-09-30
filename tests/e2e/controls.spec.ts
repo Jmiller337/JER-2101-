@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { captureAndRead, clearUtterances, expectSpoken, openMore, openToCamera, setSpeechSpeed, utterances } from "./helpers";
+import { captureAndRead, clearUtterances, expectSpoken, openMore, openToCamera, pressPlay, setSpeechSpeed, utterances } from "./helpers";
 
 test.describe("reading controls", () => {
   test.beforeEach(async ({ page }) => {
     await openToCamera(page);
     await setSpeechSpeed(page, 80);
     await captureAndRead(page);
+    await pressPlay(page);
     await expectSpoken(page, "Riverside Water Utility");
   });
 
@@ -76,20 +77,29 @@ test.describe("reading controls", () => {
     await page.getByRole("button", { name: "Done" }).click();
     await expectSpoken(page, "Resuming.");
 
-    // Settings persist across a reload.
+    // Settings persist across a reload, except the speed, which is 1 each time the app opens
+    // (docs/PROMPT-2.md section 6).
     await page.reload();
     await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
     await openMore(page);
     await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: "Settings" }).click();
     await expect(page.getByRole("switch", { name: "Automatic capture" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByLabel("Reading speed")).toHaveValue("1.4");
+    await expect(page.getByRole("button", { name: "Minimal guidance" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByLabel("Reading speed")).toHaveValue("1");
   });
 });
 
 test("at the fastest speed, Faster says so and the reading carries on", async ({ page }) => {
-  await openToCamera(page, "readAloud", { rate: 2 });
+  await openToCamera(page);
+  // The speed is not kept between launches, so it is set for this session in Settings.
+  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Reading speed").fill("2");
+  await expectSpoken(page, "Speed 2.0.");
+  await page.getByRole("button", { name: "Done" }).click();
   await setSpeechSpeed(page, 40);
   await captureAndRead(page);
+  await pressPlay(page);
   await expectSpoken(page, "Riverside Water Utility");
   await openMore(page);
   await page.getByRole("group", { name: "More reading controls" }).getByRole("button", { name: /^Faster/ }).click();

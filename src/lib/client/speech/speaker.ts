@@ -41,6 +41,9 @@ export interface SpeakerDeps {
   timers: Timers;
   defaultLang: string;
   defaultRate(): number;
+  /** The voice's pitch and loudness from Settings, for every utterance (1 when not given). */
+  pitch?(): number;
+  volume?(): number;
   /** Voice to use for a language, or null for the engine default. */
   voiceFor(lang: string): string | null;
 }
@@ -145,6 +148,8 @@ export class Speaker {
       text: job.text,
       lang,
       rate,
+      pitch: this.deps.pitch?.() ?? 1,
+      volume: this.deps.volume?.() ?? 1,
       voiceURI: this.deps.voiceFor(lang),
       onStart: () => {
         if (this.current?.id === job.id) job.opts.onStart?.();

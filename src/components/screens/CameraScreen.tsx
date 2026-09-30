@@ -3,22 +3,25 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CAMERA_MODE_NAMES, CAMERA_MODES, SwipeTracker, type CameraMode } from "@/lib/client/cameraModes";
 import { useController, useFocusRequest, useStore } from "../hooks";
-import { BackIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
+import { BackIcon, MicIcon, MoreIcon, PdfIcon, PhotoIcon, SettingsIcon } from "../icons";
 import { Button, MoreButton } from "../ui";
+import { HOLD_CLASSES, useHoldToTalk } from "../useHoldToTalk";
 
 /**
  * Screen 1, the home screen, built like the iPhone's Camera: the picture fills the whole screen,
  * and three modes sit in a glass capsule above one large action area: PDF, Camera, and Photos.
  * Swipe left or right anywhere on the screen, or tap a mode, to move between them; the app says
- * each mode's name. The preview is hidden from VoiceOver: there is nothing useful to describe,
- * and every change is spoken. VoiceOver takes sideways swipes for
- * itself, so its users switch modes with the tabs.
+ * each mode's name. Hold anywhere to say what to look for on the page ("the amount due") or to
+ * give a command. The preview is hidden from VoiceOver: there is nothing useful to describe,
+ * and every change is spoken. VoiceOver takes sideways swipes and holds for itself, so its users
+ * switch modes with the tabs and talk with the Talk button under More.
  */
 export function CameraScreen() {
   const controller = useController();
   const ui = useStore(controller.ui);
   const lastMessage = useStore(controller.announcer.lastMessage);
   const session = useStore(controller.session.store);
+  const settings = useStore(controller.settings);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -30,6 +33,8 @@ export function CameraScreen() {
   const [swipe] = useState(() => new SwipeTracker());
   /** When the last swipe ended: the click that follows a swipe with a mouse is not a tap. */
   const lastSwipeAt = useRef(-Infinity);
+  const hold = useHoldToTalk();
+  const voiceOver = settings.mode === "voiceOver";
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
 
@@ -60,7 +65,8 @@ export function CameraScreen() {
   const openPhoneCamera = () => fileRef.current?.click();
   const openPhotoPicker = () => photoRef.current?.click();
   const openPdfPicker = () => pdfRef.current?.click();
-  const status = ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage;
+  // While listening, the capsule shows what has been heard so far.
+  const status = ui.talking ? ui.heard || "Listening…" : ui.cameraStatus === "starting" ? "Starting the camera…" : lastMessage;
 
   const chooseMode = (next: CameraMode) => {
     controller.setCameraMode(next);
@@ -81,23 +87,35 @@ export function CameraScreen() {
 
   return (
     <main
-      className="relative h-dvh touch-pan-y touch-pinch-zoom overflow-hidden bg-black text-on-scrim select-none"
+      className={`relative h-dvh touch-pan-y touch-pinch-zoom overflow-hidden bg-black text-on-scrim select-none ${hold ? HOLD_CLASSES : ""}`}
       onPointerDown={(event) => {
+        hold?.onPointerDown(event);
         if (event.isPrimary) swipe.down(event.clientX, event.clientY, event.timeStamp, event.pointerId);
       }}
+      onPointerMove={hold?.onPointerMove}
       onPointerUp={(event) => {
+        // A hold is never also a swipe, even if the finger slid away to cancel it.
+        if (hold?.onPointerUp(event)) {
+          swipe.cancel();
+          return;
+        }
         const direction = swipe.up(event.clientX, event.clientY, event.timeStamp, event.pointerId);
         if (!direction) return;
         lastSwipeAt.current = event.timeStamp;
         controller.swipeCameraMode(direction);
       }}
-      onPointerCancel={() => swipe.cancel()}
+      onPointerCancel={() => {
+        hold?.onPointerCancel();
+        swipe.cancel();
+      }}
       onClickCapture={(event) => {
+        hold?.onClickCapture(event);
         if (event.timeStamp - lastSwipeAt.current < 500) {
           event.preventDefault();
           event.stopPropagation();
         }
       }}
+      onContextMenu={hold?.onContextMenu}
     >
       {/* The picture fills the whole screen, as in the iPhone's Camera, with the controls
           floating over it. */}
@@ -131,23 +149,43 @@ export function CameraScreen() {
             <span />
           )}
           <div className="flex flex-col items-end gap-2">
-            <MoreButton
-              expanded={more}
-              onToggle={() => setMore((open) => !open)}
-              controls="more-camera-options"
-              icon={<MoreIcon />}
-              variant="glass"
-            />
-            <div id="more-camera-options" hidden={!more} className="glass-dark flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card">
-              {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
-              <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+            {/* The menu opens over what is below More, so nothing moves when it opens. */}
+            <div className="relative">
+              <MoreButton
+                expanded={more}
+                onToggle={() => setMore((open) => !open)}
+                controls="more-camera-options"
+                icon={<MoreIcon />}
+                variant="glass"
+              />
+              <div
+                id="more-camera-options"
+                hidden={!more}
+                className="glass-dark absolute top-full right-0 z-20 mt-2 flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-card"
+              >
+                {!cameraFailed && <MenuItem label="Use phone camera instead" icon={<PhotoIcon />} onClick={openPhoneCamera} />}
+                <MenuItem label="Settings" icon={<SettingsIcon />} onClick={() => controller.openSettings()} />
+              </div>
             </div>
+            {/* VoiceOver mode only: VoiceOver takes holds for itself, so talking has a button,
+                under More, on the same side as Talk on the Ask screen. Nothing else moves. */}
+            {voiceOver && (
+              <Button
+                label={ui.talking ? "Stop and send" : "Talk"}
+                aria-label={ui.talking ? "Stop and send" : "Talk: say what to look for, or a command"}
+                aria-pressed={ui.talking}
+                icon={<MicIcon />}
+                variant="glass"
+                size="normal"
+                onClick={() => controller.toggleTalk()}
+              />
+            )}
           </div>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col items-center gap-2 px-4 pt-3">
           {/* The current cue, also spoken. Clipped rather than pushing Capture off a short screen. */}
-          {mode === "camera" && status && (
+          {(mode === "camera" || ui.talking) && status && (
             <p
               className="glass-dark max-w-full min-h-0 shrink overflow-hidden rounded-3xl px-5 py-2 text-center text-2xl font-semibold leading-snug"
               data-testid="camera-status"

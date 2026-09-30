@@ -9,6 +9,7 @@ export function installFakeSpeech(): void {
     text: string;
     lang: string;
     rate: number;
+    pitch: number;
     volume: number;
     voice: unknown;
     onstart: Listener | null;
@@ -16,7 +17,7 @@ export function installFakeSpeech(): void {
     onerror: Listener | null;
   }
   const w = window as unknown as {
-    __utterances: Array<{ text: string; lang: string; rate: number; at: number }>;
+    __utterances: Array<{ text: string; lang: string; rate: number; pitch: number; volume: number; at: number }>;
     __speechMsPerChar: number;
     speechSynthesis: unknown;
     SpeechSynthesisUtterance: unknown;
@@ -28,6 +29,7 @@ export function installFakeSpeech(): void {
     text: string;
     lang = "";
     rate = 1;
+    pitch = 1;
     volume = 1;
     voice: unknown = null;
     onstart: Listener | null = null;
@@ -52,7 +54,7 @@ export function installFakeSpeech(): void {
     if (current || queue.length === 0) return;
     const u = queue.shift()!;
     current = u;
-    if (u.volume > 0 && u.text.trim()) w.__utterances.push({ text: u.text, lang: u.lang, rate: u.rate, at: Date.now() });
+    if (u.volume > 0 && u.text.trim()) w.__utterances.push({ text: u.text, lang: u.lang, rate: u.rate, pitch: u.pitch, volume: u.volume, at: Date.now() });
     setTimeout(() => u.onstart?.({}), 0);
     timer = window.setTimeout(() => {
       if (current !== u) return;

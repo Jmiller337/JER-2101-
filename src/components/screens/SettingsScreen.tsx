@@ -1,16 +1,29 @@
 "use client";
 
 import { useRef, type ReactNode } from "react";
-import { RATE_MAX, RATE_MIN, RATE_STEP, THEME_NAMES, type Theme } from "@/lib/client/settings";
+import { PRIVACY_STATEMENT } from "@/lib/client/controller";
+import {
+  PITCH_MAX,
+  PITCH_MIN,
+  RATE_MAX,
+  RATE_MIN,
+  RATE_STEP,
+  THEME_NAMES,
+  VOLUME_MAX,
+  VOLUME_MIN,
+  type Theme,
+} from "@/lib/client/settings";
 import { betterVoiceAvailable } from "@/lib/client/speech/voices";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { CheckIcon, FasterIcon, SlowerIcon, SpeakerIcon } from "../icons";
 import { Button, NavBar } from "../ui";
+import { HOLD_CLASSES, holdProps, useHoldToTalk } from "../useHoldToTalk";
 
 /**
  * Settings, as an iOS grouped list: the most used sections first, one choice per row, a
  * checkmark on the selected row, and Done in the navigation bar. Every change is announced
- * through the single announcement channel; all values persist in localStorage.
+ * through the single announcement channel. Values persist in localStorage, except the speed,
+ * which is 1 each time the app opens.
  */
 export function SettingsScreen() {
   const controller = useController();
@@ -22,12 +35,13 @@ export function SettingsScreen() {
   const current = controller.currentVoice();
   const readAloud = settings.mode !== "voiceOver";
   const betterVoice = betterVoiceAvailable(allVoices, controller.voiceLanguage());
+  const hold = useHoldToTalk();
 
   return (
-    <main className="min-h-dvh bg-grouped text-text">
+    <main {...holdProps(hold)} className={`min-h-dvh bg-grouped text-text ${hold ? HOLD_CLASSES : ""}`}>
       <NavBar title="Settings" headingRef={headingRef} onDone={() => controller.closeSettings()} />
       <div className="flex flex-col gap-8 px-4 pt-4 pb-12">
-        <Group id="speed" title="Speed">
+        <Group id="speed" title="Speed" footer="Speed goes back to 1 each time the app opens.">
           <div className="flex flex-col gap-3 p-4">
             <label htmlFor="speed" className="flex items-baseline justify-between gap-3 text-xl">
               <span>Reading speed</span>
@@ -79,6 +93,26 @@ export function SettingsScreen() {
             </select>
           </div>
           <RowButton label="Preview voice" icon={<SpeakerIcon />} accent onClick={() => controller.previewVoice()} />
+          <SliderRow
+            id="tone"
+            label="Tone"
+            value={settings.pitch.toFixed(1)}
+            valueText={`Tone ${settings.pitch.toFixed(1)}`}
+            min={PITCH_MIN}
+            max={PITCH_MAX}
+            current={settings.pitch}
+            onChange={(value) => controller.setPitch(value)}
+          />
+          <SliderRow
+            id="volume"
+            label="Volume"
+            value={String(Math.round(settings.volume * 10))}
+            valueText={`Volume ${Math.round(settings.volume * 10)}`}
+            min={VOLUME_MIN}
+            max={VOLUME_MAX}
+            current={settings.volume}
+            onChange={(value) => controller.setVolume(value)}
+          />
         </Group>
 
         <Group id="colours" title="Colours" footer="Automatic follows the iPhone's light or dark setting.">
@@ -109,6 +143,19 @@ export function SettingsScreen() {
           <CheckRow label="Read aloud (app voice)" selected={readAloud} onSelect={() => controller.setMode("readAloud")} />
           <CheckRow label="VoiceOver (I use a screen reader)" selected={!readAloud} onSelect={() => controller.setMode("voiceOver")} />
         </Group>
+
+        {/* One row that is the statement itself: VoiceOver reads it as it is, and pressing it
+            has the app voice read it aloud. */}
+        <Group id="privacy" title="Privacy">
+          <button
+            type="button"
+            onClick={() => controller.sayPrivacy()}
+            className="w-full px-4 py-4 text-left text-xl leading-snug active:bg-surface-2"
+            data-testid="privacy-statement"
+          >
+            {PRIVACY_STATEMENT}
+          </button>
+        </Group>
       </div>
     </main>
   );
@@ -124,6 +171,47 @@ function Group({ id, title, footer, children }: { id: string; title: string; foo
       <div className="divide-y divide-line overflow-hidden rounded-card bg-surface">{children}</div>
       {footer && <p className="px-4 text-base text-muted">{footer}</p>}
     </section>
+  );
+}
+
+/** A slider in a list, in steps of 0.1: Tone and Volume. */
+function SliderRow({
+  id,
+  label,
+  value,
+  valueText,
+  min,
+  max,
+  current,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  valueText: string;
+  min: number;
+  max: number;
+  current: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <label htmlFor={id} className="flex items-baseline justify-between gap-3 text-xl">
+        <span>{label}</span>
+        <span className="font-bold">{value}</span>
+      </label>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={0.1}
+        value={current}
+        aria-valuetext={valueText}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-12 w-full"
+      />
+    </div>
   );
 }
 

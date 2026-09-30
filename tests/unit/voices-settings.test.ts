@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampPitch,
   clampRate,
+  clampVolume,
   DEFAULT_SETTINGS,
   forgetPasscode,
   loadPasscode,
@@ -98,15 +100,31 @@ describe("settings", () => {
     const older: Partial<typeof DEFAULT_SETTINGS> = { ...DEFAULT_SETTINGS, rate: 1.4 };
     delete older.modesLearned;
     storage.setItem("docreader.settings.v1", JSON.stringify(older));
-    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, rate: 1.4 });
+    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, modesLearned: false });
     storage.setItem("docreader.settings.v1", JSON.stringify({ ...DEFAULT_SETTINGS, modesLearned: "yes" }));
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("round-trips and clamps the rate", () => {
+  it("round-trips the settings, but the speed is back to 1 each time the app opens", () => {
     const storage = new MemoryStorage();
-    saveSettings(storage, { ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 1.5, sounds: false });
-    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 1.5, sounds: false });
+    saveSettings(storage, { ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 2, sounds: false, pitch: 1.1, volume: 0.8, talkUses: 2 });
+    expect(loadSettings(storage)).toEqual({ ...DEFAULT_SETTINGS, mode: "voiceOver", rate: 1, sounds: false, pitch: 1.1, volume: 0.8, talkUses: 2 });
+  });
+
+  it("clamps the tone and volume to their ranges in steps of 0.1", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("docreader.settings.v1", JSON.stringify({ pitch: 3, volume: 0.1 }));
+    expect(loadSettings(storage)).toMatchObject({ pitch: 1.2, volume: 0.5 });
+    expect(clampPitch(0.84)).toBe(0.8);
+    expect(clampPitch(1.06)).toBe(1.1);
+    expect(clampPitch(Number.NaN)).toBe(1);
+    expect(clampVolume(2)).toBe(1);
+    expect(clampVolume(0.74)).toBe(0.7);
+    storage.setItem("docreader.settings.v1", JSON.stringify({ talkUses: -1 }));
+    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("clamps the rate", () => {
     expect(clampRate(5)).toBe(2);
     expect(clampRate(0.1)).toBe(0.7);
     expect(clampRate(1.26)).toBe(1.3);
@@ -121,7 +139,7 @@ describe("settings", () => {
     storage.setItem("docreader.settings.v1", JSON.stringify({ rate: 9, mode: "bogus" }));
     expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
     storage.setItem("docreader.settings.v1", JSON.stringify({ rate: 9 }));
-    expect(loadSettings(storage).rate).toBe(2);
+    expect(loadSettings(storage).rate).toBe(1);
   });
 
   it("works with no storage at all", () => {

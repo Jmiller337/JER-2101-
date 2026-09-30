@@ -17,6 +17,8 @@ export interface RequestLog {
   dropped?: number;
   parserMode?: string;
   imageChars?: number;
+  /** A question came with the photo (its words are never logged). */
+  asked?: boolean;
 }
 
 export function logRequest(entry: RequestLog): void {

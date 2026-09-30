@@ -170,7 +170,7 @@ describe("Reader", () => {
     expect(port.current).toBeNull();
   });
 
-  it("reads into a page added while reading, announcing the boundary", () => {
+  it("a page added while reading waits for Play, which carries on and reads into it at the boundary", () => {
     const { port, reader } = setup();
     loadPageOne(reader);
     reader.play();
@@ -178,28 +178,35 @@ describe("Reader", () => {
     port.finish();
     reader.suspend(); // Add page pressed
     reader.setLoading(true);
-    reader.continueAfterAddPage(2);
-    expect(port.speaking).toBe("Your statement is ready.");
     reader.beginPage(2, { title: "Page two", language: "en" });
+    reader.queueAddedPage(2);
     reader.addBlock(2, 0, "paragraph", "Second page text.");
     reader.completePage(2);
     reader.setLoading(false);
+    expect(reader.store.get().status).toBe("paused");
+    expect(port.speaking).toBeNull();
+    reader.toggle(); // Play
+    expect(port.speaking).toBe("Resuming.");
     port.finishAll();
-    expect(port.texts.slice(-4)).toEqual(["Please pay by Friday.", "Page 2.", "Second page text.", END_OF_DOCUMENT]);
+    expect(port.texts.slice(-5)).toEqual(["Your statement is ready.", "Please pay by Friday.", "Page 2.", "Second page text.", END_OF_DOCUMENT]);
   });
 
-  it("says 'Page 2 added' when the document had already ended", () => {
+  it("after the end, Play starts at the added page with 'Page 2 added'", () => {
     const { port, reader } = setup();
     loadPageOne(reader);
     reader.play();
     port.finishAll();
     expect(reader.store.get().status).toBe("ended");
     reader.setLoading(true);
-    reader.continueAfterAddPage(2);
-    expect(reader.store.get().status).toBe("waiting");
     reader.beginPage(2, { title: "Page two", language: "en" });
-    expect(port.speaking).toBe("Page 2 added.");
+    reader.queueAddedPage(2);
     reader.addBlock(2, 0, "paragraph", "Second page text.");
+    reader.completePage(2);
+    reader.setLoading(false);
+    expect(reader.store.get().status).toBe("idle");
+    expect(port.speaking).toBeNull();
+    reader.toggle(); // Play
+    expect(port.speaking).toBe("Page 2 added.");
     port.finish();
     expect(port.speaking).toBe("Second page text.");
   });

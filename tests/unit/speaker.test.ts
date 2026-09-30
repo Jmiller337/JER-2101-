@@ -24,6 +24,31 @@ describe("Speaker", () => {
     expect(port.log[0]).toEqual({ text: "Hello.", lang: "en", rate: 1, voiceURI: "voice-en" });
   });
 
+  it("uses the Tone and Volume settings for every utterance, and 1 when there are none", () => {
+    const { port, speaker } = setup();
+    speaker.speak("Plain.", { priority: "high" });
+    expect(port.tones[0]).toEqual({ pitch: 1, volume: 1 });
+    let pitch = 1.1;
+    const tuned = new Speaker({
+      port,
+      timers: globalTimers,
+      defaultLang: "en",
+      defaultRate: () => 1,
+      pitch: () => pitch,
+      volume: () => 0.8,
+      voiceFor: () => null,
+    });
+    port.finishAll();
+    tuned.speak("Tuned.", { priority: "high" });
+    port.finishAll();
+    pitch = 0.9;
+    tuned.speak("Lower.", { priority: "content" });
+    expect(port.tones.slice(1)).toEqual([
+      { pitch: 1.1, volume: 0.8 },
+      { pitch: 0.9, volume: 0.8 },
+    ]);
+  });
+
   it("lets a high announcement interrupt reading and tells the reader", () => {
     const { port, speaker } = setup();
     const interrupted = vi.fn();

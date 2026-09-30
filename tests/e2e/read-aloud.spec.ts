@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { expectSpoken, openApp, openToCamera, PASSCODE, utterances } from "./helpers";
+import { captureAndRead, expectSpoken, openApp, openToCamera, PASSCODE, pressPlay, utterances } from "./helpers";
 
-test("first launch in read-aloud mode: the page is captured automatically and read", async ({ page }) => {
+const OVERVIEW = "This is a water bill from Riverside Water Utility for October.";
+const FOLLOW_UP_OVERVIEW = "What do you want to know? Hold the screen to ask, or press Play to hear everything.";
+
+test("first launch in read-aloud mode: the page is captured automatically, described, and read on Play", async ({ page }) => {
   await openApp(page);
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expectSpoken(page, /^Document Reader\. Do you use VoiceOver\?/);
@@ -9,6 +12,8 @@ test("first launch in read-aloud mode: the page is captured automatically and re
 
   await page.getByRole("button", { name: /Read aloud to me/ }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Enter the passcode" })).toBeVisible();
+  await expectSpoken(page, "Read-aloud mode. I'll speak to you.");
+  await expectSpoken(page, /^This app saves nothing\./);
   await expectSpoken(page, "Enter the passcode, then press Continue.");
 
   await page.getByLabel("Passcode").fill("wrong");
@@ -18,14 +23,20 @@ test("first launch in read-aloud mode: the page is captured automatically and re
   await page.getByLabel("Passcode").fill(PASSCODE);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Camera" })).toBeVisible();
-  // On a first launch the app also mentions the swipe between modes.
-  await expectSpoken(page, "Camera ready. Swipe left or right for PDF and Photos.");
+  // On a first launch the app also mentions holding the screen to talk and the swipe between modes.
+  await expectSpoken(
+    page,
+    "Camera ready. Hold the screen and tell me what you want to know, or just take the picture. Swipe left or right for PDF and Photos.",
+  );
 
   // The fake camera shows a steady, fully visible page: automatic capture fires on its own.
   await expectSpoken(page, "Got it. Reading.");
   await expect(page.getByRole("heading", { level: 1, name: "A water bill from Riverside Water Utility for October" })).toBeVisible();
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
+  await expectSpoken(page, OVERVIEW);
+  await expectSpoken(page, FOLLOW_UP_OVERVIEW);
 
+  await pressPlay(page);
   await expectSpoken(page, "A water bill from Riverside Water Utility for October");
   await expectSpoken(page, "Riverside Water Utility");
   await expectSpoken(page, "Questions?");
@@ -33,7 +44,14 @@ test("first launch in read-aloud mode: the page is captured automatically and re
   await expectSpoken(page, /^End of document\./);
 
   const spoken = await utterances(page);
-  const order = ["Got it. Reading.", "A water bill from Riverside Water Utility for October", "Riverside Water Utility", "Dear Ms. Alvarez, thank you for being a customer."];
+  const order = [
+    "Got it. Reading.",
+    OVERVIEW,
+    FOLLOW_UP_OVERVIEW,
+    "A water bill from Riverside Water Utility for October",
+    "Riverside Water Utility",
+    "Dear Ms. Alvarez, thank you for being a customer.",
+  ];
   const positions = order.map((text) => spoken.indexOf(text));
   expect(positions.every((p) => p >= 0)).toBe(true);
   expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -42,7 +60,8 @@ test("first launch in read-aloud mode: the page is captured automatically and re
 test("pause reports the position and play resumes", async ({ page }) => {
   await openToCamera(page);
   await page.evaluate(() => ((window as unknown as { __speechMsPerChar: number }).__speechMsPerChar = 60));
-  await page.getByRole("button", { name: "Capture" }).click();
+  await captureAndRead(page);
+  await pressPlay(page);
   await expectSpoken(page, "Riverside Water Utility");
   await page.getByRole("button", { name: "Pause" }).click();
   await expectSpoken(page, /^Paused\. /);

@@ -6,9 +6,14 @@ import {
   expectSpoken,
   openMore,
   openToCamera,
+  pressPlay,
   setSpeechSpeed,
   utterances,
 } from "./helpers";
+
+// The description is spoken sentence by sentence, as it arrives.
+const PAGE_TWO_OVERVIEW = "This is the second page of the water bill.";
+const FOLLOW_UP_OVERVIEW = "What do you want to know? Hold the screen to ask, or press Play to hear everything.";
 
 async function captureSecondPage(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Add page 2" })).toBeVisible();
@@ -17,13 +22,18 @@ async function captureSecondPage(page: Page) {
   await expect(page.getByTestId("transcript")).toContainText("Ways to pay");
 }
 
-test("adding a page after the end says 'Page 2 added' and reads it", async ({ page }) => {
+test("a page added after the end is described, and Play reads it from 'Page 2 added'", async ({ page }) => {
   await openToCamera(page);
   await captureAndRead(page);
+  await pressPlay(page);
   await expectSpoken(page, /^End of document\./);
   await openMore(page);
   await page.getByRole("button", { name: "Add page" }).click();
   await captureSecondPage(page);
+  await expectSpoken(page, PAGE_TWO_OVERVIEW);
+  await expectSpoken(page, FOLLOW_UP_OVERVIEW);
+  expect(await utterances(page)).not.toContain("Page 2 added.");
+  await pressPlay(page);
   await expectSpoken(page, "Page 2 added.");
   await expectSpoken(page, "Ways to pay");
   await expectSpoken(page, "By mail with the slip below, signed by unclear word Alvarez.");
@@ -33,15 +43,19 @@ test("adding a page after the end says 'Page 2 added' and reads it", async ({ pa
     .toBe(2);
 });
 
-test("adding a page while reading continues page 1, then announces the boundary", async ({ page }) => {
+test("after a page is added while reading, Play carries on with page 1 and announces the boundary", async ({ page }) => {
   await openToCamera(page);
   await setSpeechSpeed(page, 40);
   await captureAndRead(page);
+  await pressPlay(page);
   await expectSpoken(page, "Riverside Water Utility");
   await openMore(page);
   await page.getByRole("button", { name: "Add page" }).click();
   await setSpeechSpeed(page, 4);
   await captureSecondPage(page);
+  await expectSpoken(page, PAGE_TWO_OVERVIEW);
+  await pressPlay(page);
+  await expectSpoken(page, "Resuming.");
   await expectSpoken(page, "Page 2.");
   const spoken = await utterances(page);
   const lastPageOne = spoken.lastIndexOf("Call 555-0142, possibly, between 8 a.m. and 5 p.m.");
@@ -170,7 +184,7 @@ test("an accidental reload keeps the document", async ({ page }) => {
   await expect(page.getByTestId("transcript")).toContainText("Amount due: $84.12.");
   await expectSpoken(
     page,
-    "Your document is still here: A water bill from Riverside Water Utility for October. Press Play to hear it, or New document to start again.",
+    "Your document is still here: A water bill from Riverside Water Utility for October. Press Play to hear it, hold the screen to ask about it, or press New document to start again.",
   );
   await page.getByRole("button", { name: "Play" }).click();
   await expectSpoken(page, "Riverside Water Utility");

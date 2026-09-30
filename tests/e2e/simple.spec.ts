@@ -24,6 +24,12 @@ test("the camera screen shows only its modes, More, and Capture over the picture
   await expect(page.locator("#more-camera-options").getByRole("button")).toHaveText(["Use phone camera instead", "Settings"]);
 });
 
+test("in VoiceOver mode the camera adds only Talk, under More", async ({ page }) => {
+  await openToCamera(page, "voiceOver");
+  await expect(page.getByRole("button")).toHaveText([/More/, /Talk/, /Capture/]);
+  await expect(page.getByRole("tab")).toHaveText(["PDF", "Camera", "Photos"]);
+});
+
 test("the camera never tells the user where to put the phone", async ({ page }) => {
   await openToCamera(page);
   await expect(page.getByTestId("camera-status")).toHaveText("Camera ready.");

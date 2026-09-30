@@ -16,7 +16,7 @@ export const CAMERA_MODE_NAMES: Record<CameraMode, string> = {
 export const CAMERA_MODE_LINES: Record<CameraMode, string> = {
   pdf: "PDF. Tap the bottom of the screen to choose a file.",
   camera: "Camera.",
-  photos: "Photos. Tap the bottom of the screen to choose a photo.",
+  photos: "Photos. Tap the bottom of the screen to choose a photo or a screenshot.",
 };
 
 /** Said with "Camera ready." until the user has changed mode once. */

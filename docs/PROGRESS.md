@@ -90,7 +90,7 @@ One entry per phase: what works, what is stubbed, and what changed from `PROMPT.
 - Bundle size: the phone downloads 162 KB of JavaScript (gzipped, 547 KB raw). It was 244 KB until `zod` was removed from the phone's code: the shared protocol now uses small hand-written validators, and `zod` validates request bodies on the server only. An end-to-end test fails if the JavaScript grows past 200 KB gzipped.
 - `Dockerfile` (multi-stage, standalone output, non-root user, health check), `.dockerignore`, and `fly.toml` (HTTPS forced, auto stop and start, health check on `/api/health`, 512 MB machine). The image was built and run locally: it serves the app and icons, answers the health check, and streams a page read line by line. It is about 330 MB.
 - Returning to a visible page on the camera screen restarts a paused preview (iOS can pause it while the phone is locked).
-- Each page keeps the JPEG it was read from in memory for the session (PROMPT.md 6.4 and 6.9), for a future re-read or questions about the image. It is never written to `sessionStorage`.
+- Each page kept the JPEG it was read from in memory for the session (PROMPT.md 6.4 and 6.9), for a future re-read or questions about the image. Round 2 removed it: the photo is now dropped as soon as it has been sent, because questions about the image are not being built and the user wants nothing of hers kept.
 - `docs/SETUP.md` (Vercel, Fly.io, optional `.dev` domain, iPhone setup, first use, model and cost, privacy, troubleshooting), the finished `docs/TESTING-ON-IPHONE.md`, and a new `README.md`.
 
 **Notes.**
@@ -186,6 +186,20 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 
 - **The box around the page is gone**, at the owner's request. The picture now shows nothing drawn over it. Automatic capture is unchanged: it still needs a page with writing on it and a changed view, and the cues are still spoken. The detector still finds the page's corners, because the writing is measured inside them. The box's drawing code, styles, and tests were removed with it; the tilted-page test now checks only that the page is taken.
 
+## Round 2: after the first client meeting
+
+`docs/PROMPT-2.md` came from the first meeting with the person the app is for. What changed:
+
+- **Ask first, then read only that.** She can say what she wants before the photo ("the amount due"); the read request carries it, and the model writes one answer line before the page's text. With no question it says what the document is and its headline fact (the amount due on a bill, the total on a receipt, the balance and due date on a statement). The app says that, then one follow-up line, then waits; Play or "read everything" reads every word. Not on the page: "I can't find the amount due on this page." then "Try the other side of the page, or press Play to hear everything." Same model call as before, so no extra cost or wait. The scripted model answers the fixture page's questions and says not-found for the account number.
+- **Hold anywhere to talk** (read-aloud mode): 400 ms still starts listening with a rising tone, letting go ends it with a falling tone, sliding away cancels, 8 seconds at most. What she said is said back in a few words ("Amount due."). Commands: take a picture, read everything, play, pause, next, back, next and previous paragraph, faster, slower, spell that, new document, add a page, settings, what did you say, help. A question on the camera is kept for the next photo; on the reading screen it is answered from the document. VoiceOver mode has a Talk button under More on the camera instead, because VoiceOver takes the touches.
+- **"Let me look."** is said when an answer to a question on the reading or Ask screen has not started within 1.5 seconds. After a photo the app has just said "Got it. Looking for the amount due.", so the soft ticks carry the wait instead of a second line saying the same.
+- **Privacy.** The photo is not kept after it is sent; the words stay only until New document or the tab closes; the statement is said once on first use and is in Settings, Privacy.
+- **Speed goes back to 1 each time the app opens.** Tone and Volume are new, saved settings.
+- **Sounds instead of vibration.** She asked for vibration at the corners, but Safari on the iPhone gives websites no vibration at all. Instead the camera ticks faster as the page fills the frame and plays a two-note chime when the whole page is in view.
+- **Photos and screenshots.** The Photos mode says it takes screenshots too, which is the way to read what another app shows; a picture with little or no text is described in a sentence or two, without guessing who anyone is.
+- **Not in this round:** offline reading (reading needs the model; the owner's decision), vibration (not available to websites), reading inside other apps (not possible from a web app), and always-on listening or a wake word (a web app cannot listen in the background or while it speaks).
+- **Not verified on a real iPhone:** that Safari lets speech recognition start from a hold rather than a tap (if it does not, holding plays the rising tone but never hears anything; the fix would be a tap-to-talk button), how well recognition works in her voice and room, and that the ticks and chime are loud enough under the speech.
+
 ## What still needs the owner
 
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).
@@ -193,6 +207,9 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 3. **The manual iPhone checklist** (`docs/TESTING-ON-IPHONE.md`) with the user, including the checks that only a real iPhone can answer: that direction cues point the right way, that hand tremor does not block automatic capture, that speech is heard with the silent switch on, the flashlight, the phone call and screen lock behavior, and how VoiceOver reads the transcript.
 4. **Choosing the model** after the first real runs: Claude Opus 5.5 is the default; setting `READ_MODEL` and `ASK_MODEL` to `claude-sonnet-5` makes reading faster and cheaper (`docs/SETUP.md` section 5).
 5. **Merging or renaming the branch** if you want the code on `main`; the deploy steps work from the current default branch as it is.
+6. **A sentence about the reading service's own data retention** for the privacy statement, after checking Anthropic's current policy. The statement speaks only for the app and its server until then (`PRIVACY_STATEMENT` in `src/lib/client/controller.ts`).
+7. **Books, medical apps, and grocery apps** came up in the meeting and are not in this round. Screenshots through Photos are the way to read another app today.
+8. **Sign-off before any control moves.** She finds controls by memory; round 2 moved nothing.
 
 ## Assumptions made while building
 
@@ -200,11 +217,13 @@ Each can be changed; the reason is given.
 
 - **Cue wording** for a phone held flat over a table ("Move away from you", "Lift the phone higher", "Move closer to the page"), because "Move back" and "Move up" are ambiguous in that position (Phase 3).
 - **Framing thresholds** in `FRAMING` (`src/lib/client/vision/framing.ts`) were tuned on synthetic frames and a generated video. "Too small" is below 20 percent of the frame, not 40, because a fully visible letter-sized page covers only 40 to 55 percent of a portrait frame (Phase 3).
-- **Automatic capture is forgiving on purpose:** after a second and a half with the page in about the same place, the picture is taken even if the framing checks fail, because the reading model is a better judge of a photo than the heuristics. `calmShift` and `calmMs` in `FRAMING` set the tolerance.
+- **Automatic capture is forgiving on purpose:** after two seconds with the page in about the same place, the picture is taken even if the framing checks fail, because the reading model is a better judge of a photo than the heuristics. `calmShift` and `calmMs` in `FRAMING` set the tolerance.
 - **The camera's modes stop at the ends** (PDF on the left, Photos on the right) rather than wrapping around, as on the iPhone's Camera; a swipe past the end says the current mode again so it is never silent. Settings is not a mode because it is changed rarely.
 - **The title and problem are written in English** by the model even for a page in another language, because they are spoken with the English interface voice (Phase 1). There is no warning line: the app never remarks on the photo.
 - **A speed change restarts the current sentence** at the new speed after announcing it; **Spell** leaves the reader paused on the spelled sentence (Phase 2).
-- **Talk is a toggle** (tap to start, tap "Stop and send") rather than hold-to-talk, which is awkward with VoiceOver (Phase 4).
+- **Talk on the Ask screen is a toggle** (tap to start, tap "Stop and send"), which works with VoiceOver (Phase 4). Round 2 added holding anywhere on the screen for read-aloud mode, and the same toggle as a Talk button on the camera for VoiceOver mode.
+- **One `answer` event** carries both the answer to a question and, with no question, the sentence saying what the document is. The round 2 prompt allowed a separate `identify` event; one kind of line is simpler for the model and the phone, and the phone knows which it asked for.
+- **A question said while the page is still arriving** waits until the whole page is in, so the answer is never "I can't find it" about text that had not arrived yet.
 - **New document needs a second press** within six seconds when there is a document (Phase 4).
 - **Leaving the reading screen** for Settings or Ask pauses silently and resumes on return if it was reading; Add page continues reading page 1 after the capture (Phases 2 and 4).
 - **`/api/ask` streams NDJSON** instead of plain text so an error part-way through can be announced (Phase 4).

@@ -1,6 +1,6 @@
 # Document Reader
 
-A mobile web app that lets a blind person read paper documents with an iPhone. Hold the phone over a page and the app guides you by voice ("Move left", "Hold still") until the whole page is in view, takes the photo itself, sends it to Claude to read, and reads the text aloud with playback controls. You can add more pages and ask questions about the document ("When is it due?").
+A mobile web app that lets a blind person read paper documents with an iPhone. Hold the screen and say what you want to know ("the amount due"), hold the phone over the page, and the app takes the photo itself, sends it to Claude to read, and answers in a short sentence taken from the page. With nothing asked, it says what the document is and its main fact. Press Play (or say "read everything") to hear every word, with playback controls. You can add more pages and ask more questions ("When is it due?"). The photo is not kept.
 
 It works with or without VoiceOver: in read-aloud mode the app speaks everything itself; in VoiceOver mode it stays quiet and VoiceOver reads a properly structured page.
 
@@ -12,6 +12,7 @@ It works with or without VoiceOver: in read-aloud mode the app speaks everything
 | [`docs/TESTING-ON-IPHONE.md`](docs/TESTING-ON-IPHONE.md) | The manual checklist to run on the real iPhone after each deploy |
 | [`docs/PROGRESS.md`](docs/PROGRESS.md) | What was built in each phase, what changed from the spec and why, and what still needs the owner |
 | [`PROMPT.md`](PROMPT.md) | The full product specification the app was built from |
+| [`docs/PROMPT-2.md`](docs/PROMPT-2.md) | The changes after the first meeting with the user: answer first, hold to talk, privacy, voice settings |
 | [`CLAUDE.md`](CLAUDE.md) | Conventions and commands for anyone (or any AI assistant) changing the code |
 | [`docs/PLAN.md`](docs/PLAN.md) | The module breakdown |
 

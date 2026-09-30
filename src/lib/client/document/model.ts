@@ -17,11 +17,6 @@ export interface DocPage {
   failed?: boolean;
   /** Read from a PDF rather than photographed (it cannot be retaken with the camera). */
   fromPdf?: boolean;
-  /**
-   * The photo this page was read from, kept in memory for the session so a later version can
-   * re-read the page or answer questions about the image (PROMPT.md 6.4 and 6.9). Never stored.
-   */
-  image?: Blob;
 }
 
 export interface Doc {
@@ -94,16 +89,9 @@ export function docToAskPages(doc: Doc): string[] {
   return doc.pages.map(pageToPlainText);
 }
 
-/** Saves the document (text only, never images) so an accidental reload does not lose it. */
+/** Saves the document's text so an accidental reload does not lose it. Photos are never kept. */
 export function saveDoc(storage: StorageLike | null, doc: Doc): void {
-  writeJson(storage, DOC_KEY, {
-    ...doc,
-    pages: doc.pages.map((page) => {
-      const copy: DocPage = { ...page };
-      delete copy.image;
-      return copy;
-    }),
-  });
+  writeJson(storage, DOC_KEY, doc);
 }
 
 export function loadDoc(storage: StorageLike | null): Doc | null {

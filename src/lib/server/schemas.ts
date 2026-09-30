@@ -4,6 +4,7 @@ import {
   IMAGE_MEDIA_TYPES,
   MAX_IMAGE_BASE64_CHARS,
   MAX_PDF_BASE64_CHARS,
+  LIMITS_TEXT,
   type AskRequest,
   type ReadRequest,
 } from "@/lib/shared/protocol";
@@ -26,6 +27,7 @@ export const ReadRequestSchema = z
       .optional(),
     pageNumber: z.number().int().min(1).max(500),
     languageHint: z.string().min(2).max(35).nullable().optional(),
+    question: z.string().trim().min(1).max(LIMITS_TEXT.question).optional(),
   })
   .refine((body) => (body.image ? 1 : 0) + (body.pdf ? 1 : 0) === 1, "send exactly one of image and pdf");
 

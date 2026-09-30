@@ -164,6 +164,14 @@ export class Reader {
     this.speakCurrent();
   }
 
+  /** Reads the whole document from its first line ("read everything"). */
+  readFromStart(): void {
+    this.invalidate();
+    this.deps.speaker.cancelContent();
+    this.index = 0;
+    this.speakCurrent();
+  }
+
   /** Continues after a pause, saying "Resuming." first. */
   resume(): void {
     if (this.status !== "paused") {
@@ -309,19 +317,18 @@ export class Reader {
   }
 
   /**
-   * After a new page is captured. If the document had ended, the new page is announced with
-   * "Page N added." and read from its start; otherwise reading continues where it was and flows
-   * into the new page at the boundary.
+   * A page was added and nothing plays by itself (answer first, docs/PROMPT-2.md section 3). If
+   * the document had been read to the end, Play now starts at the new page with "Page N added.";
+   * otherwise Play carries on from where the reading stopped and flows into the new page.
    */
-  continueAfterAddPage(page: number): void {
-    const ended = this.status === "ended" || (this.index >= this.items.length && this.items.length > 0);
+  queueAddedPage(page: number): void {
+    const first = this.items.findIndex((item) => item.page === page);
+    if (first === -1 || (this.status !== "ended" && this.index < first)) return;
     this.invalidate();
     this.deps.speaker.cancelContent();
-    if (ended) {
-      this.pendingAddedPage = page;
-      this.index = this.items.length;
-    }
-    this.speakCurrent();
+    this.index = first;
+    this.pendingAddedPage = page;
+    this.setStatus("idle");
   }
 
   /** "Paused. Paragraph 3 of 7, page 1 of 2." */

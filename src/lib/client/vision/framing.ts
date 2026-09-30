@@ -289,3 +289,56 @@ export class CuePolicy {
     this.lastSpokenText = null;
   }
 }
+
+/**
+ * The framing sounds (docs/PROMPT-2.md section 8), standing in for the vibration a website cannot
+ * make on an iPhone: soft ticks while a page is in view, quicker as it fills more of the frame,
+ * then one two-note chime when the whole page is in view. Played only under the Sounds switch.
+ */
+export const FRAMING_SOUNDS = {
+  /** Tick interval for a page that fills `fromCoverage` of the frame or less... */
+  slowestMs: 1000,
+  /** ...and for one that fills `fullCoverage` or more. */
+  fastestMs: 250,
+  fromCoverage: 0.05,
+  fullCoverage: 0.5,
+} as const;
+
+export function tickIntervalMs(coverage: number): number {
+  const { slowestMs, fastestMs, fromCoverage, fullCoverage } = FRAMING_SOUNDS;
+  const t = Math.min(1, Math.max(0, (coverage - fromCoverage) / (fullCoverage - fromCoverage)));
+  return Math.round(slowestMs - t * (slowestMs - fastestMs));
+}
+
+/** A page is in view, whole or not. */
+const PAGE_IN_VIEW: ReadonlySet<Situation["kind"]> = new Set(["tooBig", "tooSmall", "cutOff", "glare", "moving", "settling", "blurry", "ready"]);
+/** The whole page is in view and the phone is holding it there. */
+const FRAMED: ReadonlySet<Situation["kind"]> = new Set(["settling", "blurry"]);
+/** The page is no longer wholly in view, so the chime may play again. */
+const UNFRAMED: ReadonlySet<Situation["kind"]> = new Set(["dark", "noPage", "noText", "samePage", "tooBig", "tooSmall", "cutOff"]);
+
+export class FramingSounds {
+  private lastTickAt = -Infinity;
+  private chimed = false;
+
+  reset(): void {
+    this.lastTickAt = -Infinity;
+    this.chimed = false;
+  }
+
+  /** The sound to play for this frame, if any. */
+  next(situation: Situation, coverage: number, now: number): "tick" | "chime" | null {
+    const kind = situation.kind;
+    if (UNFRAMED.has(kind)) this.chimed = false;
+    if (FRAMED.has(kind) || (kind === "ready" && !situation.lenient)) {
+      if (this.chimed) return null;
+      this.chimed = true;
+      return "chime";
+    }
+    // Once the chime has played the ticks stop: the framing is right, and the picture follows.
+    if (!PAGE_IN_VIEW.has(kind) || this.chimed || kind === "ready") return null;
+    if (now - this.lastTickAt < tickIntervalMs(coverage)) return null;
+    this.lastTickAt = now;
+    return "tick";
+  }
+}

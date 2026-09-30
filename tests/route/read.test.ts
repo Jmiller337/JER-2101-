@@ -33,7 +33,30 @@ describe("POST /api/read", () => {
     expect(params).not.toHaveProperty("temperature");
     const content = params.messages[0]!.content as Array<{ type: string; text?: string }>;
     expect(content.map((c) => c.type)).toEqual(["image", "text"]);
-    expect(content[1]!.text).toBe("Page 3. Read this page. The document is probably in es.");
+    expect(content[1]!.text).toBe(
+      "Page 3. Read this page. The document is probably in es. No question was asked: the answer line says what this is and its headline fact.",
+    );
+  });
+
+  it("sends the question asked before the photo, and streams the answer before the text", async () => {
+    const ANSWER = { type: "answer", text: "The amount due is $84.12." };
+    const deps = makeDeps({ chunks: chunkText(ndjson(META, ANSWER, BLOCK, { type: "done", blocks: 1 }), 11) });
+    const res = await handleRead(postJson("/api/read", { ...GOOD_BODY, question: "the amount due" }), deps);
+    expect(await readNdjson(res)).toEqual([META, ANSWER, BLOCK, { type: "done", blocks: 1 }]);
+    const content = deps.calls[0]!.messages[0]!.content as Array<{ type: string; text?: string }>;
+    expect(content[1]!.text).toBe(
+      'Page 1. Read this page. Before taking the photo the listener asked: "the amount due". The answer line answers that.',
+    );
+    // The log says a question came, never what it was.
+    expect(deps.logs[0]).toMatchObject({ asked: true });
+    expect(JSON.stringify(deps.logs[0])).not.toContain("amount due");
+  });
+
+  it("rejects an empty or overlong question", async () => {
+    for (const question of ["   ", "x".repeat(301)]) {
+      const res = await handleRead(postJson("/api/read", { ...GOOD_BODY, question }), makeDeps({ chunks: [] }));
+      expect(res.status).toBe(400);
+    }
   });
 
   it("delivers the first event before the model finishes", async () => {

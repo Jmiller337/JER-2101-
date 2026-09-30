@@ -12,7 +12,7 @@ import {
 // The default fake camera: a page held steady in the middle of the picture.
 
 const PDF_LINE = "PDF. Tap the bottom of the screen to choose a file.";
-const PHOTOS_LINE = "Photos. Tap the bottom of the screen to choose a photo.";
+const PHOTOS_LINE = "Photos. Tap the bottom of the screen to choose a photo or a screenshot.";
 
 async function selectedMode(page: Page) {
   return page.getByRole("tab", { selected: true }).textContent();

@@ -36,15 +36,17 @@ The server has three routes (`/api/auth`, `/api/read`, `/api/ask`) plus `/api/he
 - `speech/reader.ts`: the reading state machine: items (title, warnings, page starts, sentence chunks), play, pause with position report, resume, sentence and paragraph navigation, spell, speed, waiting ticks, end of document, pages appended while playing or after the end.
 - `speech/streamingSpeech.ts`: speaks a streamed answer sentence by sentence.
 - `announce/`: live-region controller (status and alert regions) and the `Announcer` that routes each message to speech or to the live region according to the mode.
-- `audio/sounds.ts`: Web Audio tones (shutter, tick, error, page found).
+- `audio/sounds.ts`: Web Audio tones (shutter, tick, error, page found, the rising and falling tones around listening, the framing ticks and chime).
+- `voice/`: hold to talk (round 2): `hold.ts`, the press-and-hold gesture (400 ms, 8 s cap, cancel on slide), and `commands.ts`, the spoken command list, the unknown line, and saying a question back in a few words.
+- `speech/recognition.ts`: the browser's speech recognition, one session at a time, for Talk on the Ask screen and for hold to talk.
 - `camera/`: `getUserMedia` start and stop, still capture (`ImageCapture.takePhoto` with a canvas fallback), torch, in-app browser detection, image preparation (2000 px long edge, JPEG 0.85, base64), frame sampling for analysis.
 - `vision/`: pure frame analysis (luma, brightness, glare, page region with a bright-region strategy and an edge-density fallback, steadiness, sharpness), situation classification, cue wording, cue policy (hysteresis, 1.5 s spacing, 4 s repeat suppression, minimal mode), auto-capture readiness.
-- `document/`: the document model, plain-text export for questions, `sessionStorage` persistence, and `DocumentSession`, which runs a page read and feeds the reader and the transcript.
+- `document/`: the document model, plain-text export for questions, `sessionStorage` persistence of the words (never the photo), and `DocumentSession`, which runs a page read (with the question asked before the photo) and feeds the reader and the transcript.
 - `wakeLock.ts`: screen wake lock with re-acquire on visibility change.
-- `controller.ts`: wiring, navigation, and the flows (start, mode choice, passcode, camera, capture, reading, add page, ask, settings).
+- `controller.ts`: wiring, navigation, and the flows (start, mode choice, passcode, camera, capture, the answer before the reading, reading, add page, ask, hold to talk, settings).
 
 ### React (`src/components`)
-- `AppShell`, `LiveRegions`, shared button components.
+- `AppShell`, `LiveRegions`, shared button components, and `useHoldToTalk`, which turns a screen's pointer events into hold to talk.
 - Screens: Start, Mode, Passcode, Camera, Reading (with `Transcript` and `ReaderControls`), Ask, Settings.
 
 ## Build order

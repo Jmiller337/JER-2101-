@@ -1,28 +1,30 @@
 # Testing on the iPhone
 
+**Every item is checked with eyes closed**, by someone who has not seen the screen that day. Open your eyes only to write down the result. If a step cannot be done with eyes closed, it fails, even if it works when you look.
+
 Nothing in automated testing runs iOS Safari with a real camera, real speech, and real VoiceOver. This checklist is for the owner and the user to run together on the user's iPhone after each deploy. It takes about 30 minutes. Write down anything that fails, with what was said on screen, and pass it back to whoever maintains the app.
 
 Before starting:
 
 - Deploy the app (see `docs/SETUP.md`) and open its address in **Safari** (not in another app's built-in browser).
-- Have ready: a one-page printed letter or bill, a two-page letter, a handwritten note, and a table lamp.
+- Have ready: a one-page printed letter or bill, a two-page letter, a handwritten note, a shop receipt, a credit card or bank statement, and a table lamp.
 - Turn the ring/silent switch to silent once during the test (step 5) to check that the app is still heard.
 
 ## 1. First launch, read-aloud mode (VoiceOver off)
 
 - [ ] The page shows one large yellow button: "Start. Tap anywhere."
 - [ ] Tapping it says: "Document Reader. Do you use VoiceOver? Tap the top half of the screen for yes, or the bottom half for no."
-- [ ] Tapping the bottom half says "Read-aloud mode. I'll read everything to you." then "Enter the passcode, then press Continue."
+- [ ] Tapping the bottom half says "Read-aloud mode. I'll speak to you.", then the privacy statement ("This app saves nothing. …"), then "Enter the passcode, then press Continue."
 - [ ] A wrong passcode says "That passcode is not right. Try again." The right one says "Passcode accepted."
 - [ ] Safari asks for the camera after the app says "I need the camera to see the page. Tap Allow if your phone asks."
-- [ ] The camera preview appears and the app says "Camera ready."
+- [ ] The camera preview appears and the app says "Camera ready. Hold the screen and tell me what you want to know, or just take the picture." (After you have talked to it three times it says only "Camera ready.")
 
 ## 2. Reading a page
 
-- [ ] Hold the phone over the one-page letter and press Capture. The app says "Got it. Reading." and, within a few seconds, a one-sentence description of the document (for example "A water bill from…"), then starts reading.
-- [ ] Note roughly how long it took from "Got it. Reading." to the first word of the description: ______ seconds.
+- [ ] Hold the phone over the one-page letter and press Capture. The app says "Got it. Reading." and, within a few seconds, one sentence saying what the document is and who it is from, with its main fact (for example "This is a water bill from … The amount due is …"), then "What do you want to know? Hold the screen to ask, or press Play to hear everything." Then it is silent.
+- [ ] Note roughly how long it took from "Got it. Reading." to the first word of that sentence: ______ seconds.
 - [ ] Silence never lasts more than about three seconds without a soft tick.
-- [ ] Amounts, dates, and phone numbers are read exactly as printed.
+- [ ] Press Play: the whole page is read from the title. Amounts, dates, and phone numbers are read exactly as printed.
 - [ ] At the end: "End of document. Press Play to hear it again."
 - [ ] The sentence being read is highlighted in yellow and scrolls into view.
 
@@ -33,7 +35,8 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 - [ ] With nothing under the camera the app says "I can't see a page."
 - [ ] Slide the phone so the page is cut off on the left. The app says "Move left." Moving the phone to the left brings the page into view. Repeat for right ("Move right."), top ("Move away from you."), and bottom ("Move toward you."). **If any direction is backwards, write down which.**
 - [ ] Held very close (page overflowing the screen): "Lift the phone higher." Held far away: "Move closer to the page."
-- [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and reads the page. No button press needed.
+- [ ] With the whole page in view while moving: "I see the whole page. Hold still." Held still for about a second, the app plays the shutter, says "Got it. Reading.", and says what the page is. No button press needed.
+- [ ] While a page is partly in view, soft ticks play, faster as the page fills more of the screen. When the whole page is in view, a two-note chime plays once. With Settings, Sounds off, neither plays. Note whether they can be heard over the guidance: ______
 - [ ] Hold the phone too close (the page overflowing the screen) but still for about a second and a half: the app takes the picture anyway, and either reads the page or says what to change. Note roughly how long it waited: ______ seconds.
 - [ ] Nothing is drawn over the camera picture: no box or frame around the page.
 - [ ] Hard framings: the page at an angle, the page cut off at one edge, the page small in the picture, a dim room with one lamp. In each, holding the phone still for about two seconds takes the picture. Note any case where it never does: ______
@@ -61,7 +64,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 
 ## 3a. Several pages
 
-- [ ] After page 1 has finished, press Add page. The camera screen says "Add page 2" and the app says "Add page 2.". After the capture it says "Page 2 added." and reads page 2.
+- [ ] After page 1 has finished, press Add page. The camera screen says "Add page 2" and the app says "Add page 2.". After the capture it says what page 2 is, and Play reads on into it.
 - [ ] Start a new two-page letter. Press Add page while page 1 is still being read, capture page 2, and check that the app goes back to where it was on page 1, then says "Page 2." at the boundary and reads on.
 - [ ] Pause shows the page: "Paused. Paragraph 2 of 5, page 2 of 2."
 - [ ] Reload the page in Safari (or close and reopen the tab): after Start, the app says "Your document is still here…" and Play reads it.
@@ -72,7 +75,7 @@ Hold the phone flat above the page on a table, top of the phone pointing away fr
 Before starting, save a PDF to the iPhone's Files app (for example a bill emailed as a PDF: open the attachment, tap Share, then Save to Files).
 
 - [ ] On the camera screen, swipe right to PDF (the app says "PDF. Tap the bottom of the screen to choose a file."), then tap the bottom of the screen. The file picker opens; choose the PDF.
-- [ ] The app says "Got it. Reading the PDF.", then what the document is, then reads it.
+- [ ] The app says "Got it. Reading the PDF.", then what the document is. Play reads it.
 - [ ] Between pages it says "Page 2.", and it reads to the end of the last page.
 - [ ] Ask a question about something on the second page: the answer is right.
 - [ ] Press Add page while the PDF is still being read: the app says "Wait a moment, I'm still reading the PDF."
@@ -97,7 +100,7 @@ Before starting, save a PDF to the iPhone's Files app (for example a bill emaile
 - [ ] The voice list shows the phone's voices. If an Enhanced or Premium voice is installed, "Automatic" uses it. Preview speaks a sample.
 - [ ] If the Voice section shows "A nicer voice is available", download a voice as it says (Ava or Zoe, Enhanced or Premium). Afterwards the card is gone and Preview sounds noticeably better.
 - [ ] "Back to reading" says "Resuming." and continues.
-- [ ] Settings survive closing and reopening Safari.
+- [ ] Settings survive closing and reopening Safari, except the speed (section 11).
 
 ## 4b. Simple screens
 
@@ -108,11 +111,11 @@ Before starting, save a PDF to the iPhone's Files app (for example a bill emaile
 ## 4c. Modes (like the iPhone's Camera)
 
 - [ ] The first time the camera opens, the app says "Camera ready. Swipe left or right for PDF and Photos." After the first mode change it says only "Camera ready.".
-- [ ] Swipe left anywhere on the screen: the strip moves to Photos (in yellow) and the app says "Photos. Tap the bottom of the screen to choose a photo." Swipe right twice: "Camera.", then "PDF. …". Swiping past either end says the current mode again.
+- [ ] Swipe left anywhere on the screen: the strip moves to Photos (in yellow) and the app says "Photos. Tap the bottom of the screen to choose a photo or a screenshot." Swipe right twice: "Camera.", then "PDF. …". Swiping past either end says the current mode again.
 - [ ] A swipe that starts on the Capture panel changes mode and does not take a picture.
 - [ ] Tapping a mode's name does the same as swiping to it.
 - [ ] In PDF or Photos, the app does not talk about the page or take a picture, even with a page in view. Back in Camera, guidance and automatic capture start again.
-- [ ] Photos: tap the bottom of the screen, choose a photo or a screenshot from the library, and the app reads it.
+- [ ] Photos: tap the bottom of the screen, choose a photo or a screenshot from the library, and the app says what it is. A screenshot of another app (take one with the side and volume-up buttons) is read. A photo with no writing (a view, a pet) is described in a sentence or two, without naming anyone.
 - [ ] Pinch to zoom still works on the camera screen, and swiping up or down does nothing.
 
 ## 4a. Colours and focus
@@ -142,6 +145,7 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] Nothing is announced twice.
 - [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and moving the speed slider reads the new speed once.
 - [ ] On the camera screen, VoiceOver reads "Camera ready." before the first framing cue.
+- [ ] Holding the screen does nothing in VoiceOver mode. On the camera, a Talk button sits just under More. Double-tap Talk, say "the amount due", double-tap "Stop and send": VoiceOver reads "Amount due." Capture a bill: VoiceOver reads the amount due.
 - [ ] VoiceOver finds the modes as tabs ("PDF, tab, 1 of 3"). Double-tapping one switches to it, VoiceOver says it is selected, and the app adds nothing of its own. (One-finger swipes belong to VoiceOver, so they move between items instead of changing mode; that is expected.)
 
 ## 7. Hard cases
@@ -168,6 +172,39 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] Ask the owner to change the passcode on the server. The next capture says "The passcode was not accepted. Please enter it again." and shows the passcode screen.
 - [ ] Open the app with the ring/silent switch on silent: speech is still heard (or note that it is not).
 - [ ] With VoiceOver mode on, none of the errors above is spoken by the app's own voice; VoiceOver reads them.
+
+## 9. Ask, then scan
+
+Do each with a receipt, a bill, and a statement.
+
+- [ ] On the camera, hold the screen, say "the total" (receipt), "the amount due" (bill), or "the minimum payment" (statement), and let go. The app says it back in a few words ("Total.").
+- [ ] Take the picture. The app says "Got it. Looking for the total." and then the answer in one or two short sentences, then "Hold the screen to ask something else, or press Play to hear everything." Then it is silent until you do something.
+- [ ] The answer is right, word for word with the page. Note anything that was not: ______
+- [ ] Ask for something that is not on the page ("the account number" on a receipt): "I can't find the account number on this page." then "Try the other side of the page, or press Play to hear everything."
+- [ ] Say two things at once ("the amount and the due date"): both are answered.
+- [ ] Cover the amount with a finger and ask for it: the app says it cannot find it or that it is hard to read. It never says a number that is not there.
+- [ ] Take a picture without asking: one sentence saying what it is and its main fact (a receipt: where, the date, and the total; a statement: the balance, the minimum payment, and the due date).
+
+## 10. Hold to talk
+
+- [ ] Hold anywhere on the camera screen, on the reading screen, and on a button: after less than half a second a rising tone plays. Let go: a falling tone. A hold on a button never presses it.
+- [ ] If the rising tone plays but the app never hears anything (it always says "I didn't catch that."), write that down: Safari may be refusing to listen after a hold, and the app will need a tap to talk instead.
+- [ ] Hold, say nothing, let go: "I didn't catch that. Hold the screen and try again."
+- [ ] Hold, then slide your finger far away before letting go: the app says "Cancelled." and does nothing else.
+- [ ] Hold and keep holding for more than eight seconds: listening stops by itself with the falling tone.
+- [ ] Say each command once and check what happens: "take a picture" (takes it), "read everything" ("Reading everything." and the whole document), "pause", "play", "next", "back", "next paragraph", "previous paragraph", "faster", "slower", "spell that", "add a page", "settings", "what did you say" (says the last thing again), "help" (lists the commands), "new document" (straight back to the camera, no second press).
+- [ ] Say something the app cannot do ("turn on the flash"): "I heard: turn on the flash. I don't know that one. Say help for what you can say."
+- [ ] On the reading screen, hold and ask "who is it from?": the app says the question back, then answers from the document. If the answer takes a moment, it says "Let me look." first.
+- [ ] While the app is reading, hold the screen: it stops talking at once.
+- [ ] Tapping, swiping between modes, and scrolling the text still work as before.
+
+## 11. Privacy, speed, tone, and volume
+
+- [ ] Settings, Privacy: pressing the row reads "This app saves nothing. …" aloud.
+- [ ] After a page has been read, open the iPhone's Photos app: no photo from Document Reader is there.
+- [ ] Set the speed to 2 in Settings. Close Safari completely (swipe it away in the app switcher) and open the app again: it reads at the normal speed, and Settings shows 1.0. The Speed section says "Speed goes back to 1 each time the app opens."
+- [ ] Settings, Voice, Tone: moving the slider says "Tone 1.1." and the voice sounds higher. It is kept after closing Safari.
+- [ ] Settings, Voice, Volume: moving the slider says "Volume 8." and the voice is quieter. The phone's own volume buttons still work. It is kept after closing Safari.
 
 ## 8. Recording results
 

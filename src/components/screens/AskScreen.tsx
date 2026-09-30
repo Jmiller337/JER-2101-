@@ -5,6 +5,7 @@ import { ASK_LIMITS } from "@/lib/shared/protocol";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { MicIcon, SendIcon } from "../icons";
 import { Button, NavBar } from "../ui";
+import { HOLD_CLASSES, holdProps, useHoldToTalk } from "../useHoldToTalk";
 
 /**
  * Screen 3: ask a question about the document. A text field (iOS keyboard dictation works here,
@@ -21,9 +22,10 @@ export function AskScreen() {
   useFocusRequest(headingRef, "heading");
   useFocusRequest(errorRef, "error");
   const value = ask.listening ? ask.heard : draft;
+  const hold = useHoldToTalk();
 
   return (
-    <main className="min-h-dvh bg-grouped text-text">
+    <main {...holdProps(hold)} className={`min-h-dvh bg-grouped text-text ${hold ? HOLD_CLASSES : ""}`}>
       <NavBar title="Ask a question" headingRef={headingRef} onDone={() => controller.closeAsk()} />
       <div className="flex flex-col gap-6 px-4 pt-4 pb-10">
       <form

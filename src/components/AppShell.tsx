@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useController, useStore } from "./hooks";
+import { MicIcon } from "./icons";
 import { LiveRegions } from "./LiveRegions";
 import { AskScreen } from "./screens/AskScreen";
 import { CameraScreen } from "./screens/CameraScreen";
@@ -13,7 +14,7 @@ import { StartScreen } from "./screens/StartScreen";
 
 export function AppShell() {
   const controller = useController();
-  const { screen, speechUnavailable } = useStore(controller.ui);
+  const { screen, speechUnavailable, talking, heard } = useStore(controller.ui);
   const { theme } = useStore(controller.settings);
   useEffect(() => applyTheme(theme), [theme]);
   return (
@@ -31,6 +32,17 @@ export function AppShell() {
       {screen === "reading" && <ReadingScreen />}
       {screen === "ask" && <AskScreen />}
       {screen === "settings" && <SettingsScreen />}
+      {/* While the microphone listens after a hold: a glass capsule with what has been heard so
+          far. The rising and falling tones say the same to the ear, so it is hidden from
+          VoiceOver. The camera shows this in its own status capsule. */}
+      {talking && screen !== "camera" && (
+        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] z-40 flex justify-center px-4" data-testid="listening">
+          <p className="glass flex max-w-full items-center gap-2.5 rounded-full px-5 py-2.5 text-2xl font-semibold text-text">
+            <MicIcon className="h-7 w-7 shrink-0" />
+            <span className="truncate">{heard || "Listening…"}</span>
+          </p>
+        </div>
+      )}
     </>
   );
 }

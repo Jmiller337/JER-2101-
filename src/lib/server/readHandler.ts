@@ -33,7 +33,7 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
           content: [
             // The document first, then the instruction.
             { type: "document", source: { type: "base64", media_type: "application/pdf", data: request.pdf.data } },
-            { type: "text", text: readPdfUserText(request.languageHint) },
+            { type: "text", text: readPdfUserText(request.languageHint, request.question) },
           ],
         },
       ],
@@ -50,7 +50,7 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
         content: [
           // Image first, then the instruction.
           { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
-          { type: "text", text: readUserText(request.pageNumber, request.languageHint) },
+          { type: "text", text: readUserText(request.pageNumber, request.languageHint, request.question) },
         ],
       },
     ],
@@ -160,6 +160,7 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
         blocks: stats.blocks,
         dropped: stats.dropped,
         parserMode: stats.mode,
+        asked: Boolean(request.question),
         imageChars: request.image?.data.length,
         pdfChars: request.pdf?.data.length,
         pages: stats.pages,

@@ -9,6 +9,8 @@ export class FakeSpeechPort implements SpeechPort {
   available = true;
   voices: VoiceInfo[] = [];
   log: Array<{ text: string; lang: string; rate: number; voiceURI: string | null }> = [];
+  /** Pitch and volume of each utterance, in the same order as `log`. */
+  tones: Array<{ pitch: number; volume: number }> = [];
   current: UtteranceRequest | null = null;
   cancelCount = 0;
   primed = 0;
@@ -16,6 +18,7 @@ export class FakeSpeechPort implements SpeechPort {
   speak(request: UtteranceRequest): void {
     this.current = request;
     this.log.push({ text: request.text, lang: request.lang, rate: request.rate, voiceURI: request.voiceURI });
+    this.tones.push({ pitch: request.pitch, volume: request.volume });
     request.onStart();
   }
 

@@ -2,6 +2,7 @@ import { LineSplitter } from "@/lib/shared/ndjson";
 import { spokenError } from "@/lib/shared/messages";
 import {
   BLOCK_KINDS,
+  LIMITS_TEXT,
   type BlockEvent,
   type BlockKind,
   type ErrorCode,
@@ -52,6 +53,7 @@ export class ModelOutputParser {
   private dropped = 0;
   private paragraph: string[] = [];
   private closed = false;
+  private answerSent = false;
   private page: number;
   private blocksOnPage = 0;
 
@@ -202,6 +204,18 @@ export class ModelOutputParser {
       this.page += 1;
       this.blocksOnPage = 0;
       out.push({ type: "page", number: this.page });
+      return true;
+    }
+    if (obj.type === "answer") {
+      // One answer line, after the meta line of a page that could be read. A second one, or one
+      // for a page that could not be read, is dropped.
+      const text = cleanString(obj.text, LIMITS_TEXT.answer);
+      if (!text || this.answerSent || !this.metaSent || this.metaStatus === "retry") {
+        this.dropped += 1;
+        return true;
+      }
+      this.answerSent = true;
+      out.push({ type: "answer", text });
       return true;
     }
     if (obj.type === "done") return true;

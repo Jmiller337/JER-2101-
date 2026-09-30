@@ -1,12 +1,21 @@
-type ToneShape = { freq: number; start: number; duration: number; gain: number; type?: OscillatorType };
+type ToneShape = {
+  freq: number;
+  /** Glide to this frequency over the tone's length. */
+  toFreq?: number;
+  start: number;
+  duration: number;
+  gain: number;
+  type?: OscillatorType;
+};
 
 interface AudioSessionLike {
   type?: string;
 }
 
 /**
- * Short earcons made with the Web Audio API (PROMPT.md 6.7): shutter, tick, error, page found.
- * Each is under 300 ms. The audio context is created and resumed inside the Start tap, which
+ * Short earcons made with the Web Audio API (PROMPT.md 6.7): shutter, tick, error, page found,
+ * the rising and falling tones around listening, and the framing chime. Each is under 300 ms.
+ * (Websites cannot vibrate an iPhone, so these stand in for vibration; docs/PROMPT-2.md section 8.) The audio context is created and resumed inside the Start tap, which
  * iOS requires before any sound can play.
  */
 export class Sounds {
@@ -56,6 +65,29 @@ export class Sounds {
     ]);
   }
 
+  /** A hold has started listening (docs/PROMPT-2.md section 4). */
+  listenStart(): void {
+    this.tones([{ freq: 520, toFreq: 1040, start: 0, duration: 0.16, gain: 0.22 }]);
+  }
+
+  /** Listening has stopped. */
+  listenEnd(): void {
+    this.tones([{ freq: 1040, toFreq: 520, start: 0, duration: 0.16, gain: 0.22 }]);
+  }
+
+  /** A soft tick while framing; the camera plays them faster as the page fills the frame. */
+  framingTick(): void {
+    this.tones([{ freq: 1320, start: 0, duration: 0.03, gain: 0.08 }]);
+  }
+
+  /** The whole page is in view: a clear two-note chime, just before the picture. */
+  framed(): void {
+    this.tones([
+      { freq: 784, start: 0, duration: 0.12, gain: 0.22, type: "triangle" },
+      { freq: 1175, start: 0.12, duration: 0.16, gain: 0.22, type: "triangle" },
+    ]);
+  }
+
   pageFound(): void {
     this.tones([
       { freq: 660, start: 0, duration: 0.08, gain: 0.2 },
@@ -77,8 +109,9 @@ export class Sounds {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = shape.type ?? "sine";
-      osc.frequency.value = shape.freq;
       const t0 = now + shape.start;
+      osc.frequency.setValueAtTime(shape.freq, t0);
+      if (shape.toFreq) osc.frequency.exponentialRampToValueAtTime(shape.toFreq, t0 + shape.duration);
       gain.gain.setValueAtTime(0.0001, t0);
       gain.gain.exponentialRampToValueAtTime(shape.gain, t0 + 0.01);
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + shape.duration);

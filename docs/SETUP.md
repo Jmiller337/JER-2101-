@@ -150,7 +150,10 @@ The server logs one line per request with timings, token counts, and the outcome
 ## 6. Privacy
 
 - Photos are sent to Anthropic's API to be read and are not stored by the app. Anthropic's documentation states that uploaded images are not used to train models; see Anthropic's privacy policy and commercial terms for how API data is retained.
-- The app stores nothing on the server. The current document's text stays in the phone's browser for the session (so a reload does not lose it) and is cleared by **New document**. Settings and the passcode are kept on the phone.
+- The app stores nothing on the server, and the server's logs never contain the document's text or the questions asked: one line per request with timings, token counts, and whether a question was asked.
+- The photo is not kept on the phone: it exists only while it is prepared and sent. The current document's words stay in the phone's browser for this tab (so a reload does not lose them) and are cleared by **New document** and when the tab is closed. Settings and the passcode are kept on the phone.
+- The app says this once on first use and in Settings, Privacy: "This app saves nothing. Your photo is sent once to be read, then deleted from the phone. The words are kept only until you start a new document or close the app. Nothing is stored on the server." It says nothing about the reading service's own retention; add a sentence to `PRIVACY_STATEMENT` in `src/lib/client/controller.ts` once you have checked Anthropic's current policy.
+- Holding the screen to talk uses Safari's speech recognition, which on the iPhone sends the audio to Apple to be recognized (as dictation does).
 - Anyone with the address **and** the passcode can use the app and your API key. Change the passcode if it may have been shared.
 
 ---

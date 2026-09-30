@@ -12,7 +12,6 @@ const IMAGE: PreparedImage = {
   width: 10,
   height: 10,
   bytes: 3,
-  blob: new Blob(["jpeg"], { type: "image/jpeg" }),
 };
 
 function api(events: ReadEvent[], opts: { throwAfter?: ApiError } = {}): ApiClient & { requests: unknown[] } {
@@ -35,6 +34,7 @@ function callbacks(): PageReadCallbacks & { calls: string[] } {
     calls,
     onRetry: (problem) => calls.push(`retry:${problem}`),
     onPageStart: (page) => calls.push(`start:${page.number}`),
+    onAnswer: (page, text) => calls.push(`answer:${page.number}:${text}`),
     onBlock: (page, index) => calls.push(`block:${page.number}:${index}`),
     onPageDone: (page) => calls.push(`done:${page.number}`),
     onError: (code, _message, page) => calls.push(`error:${code}:${page?.number ?? "none"}`),
@@ -85,9 +85,23 @@ describe("DocumentSession", () => {
     expect(session.nextPageNumber).toBe(2);
     expect(loadDoc(storage)?.pages[0]?.blocks).toEqual([{ kind: "paragraph", text: "Hello." }]);
     expect(session.isReading).toBe(false);
-    // The photo stays in memory with the page but is never written to storage.
-    expect(session.doc?.pages[0]?.image).toBeInstanceOf(Blob);
+    // Privacy (docs/PROMPT-2.md section 5): the page holds only text, never the photo.
+    expect(Object.keys(session.doc!.pages[0]!)).not.toContain("image");
     expect(storage.getItem("docreader.document.v1")).not.toContain("image");
+  });
+
+  it("sends the question asked before the photo and reports the answer before the text", async () => {
+    const answer: ReadEvent = { type: "answer", text: "The amount due is $84.12." };
+    const client = api([META, answer, BLOCK, { type: "done", blocks: 1 }]);
+    const session = new DocumentSession({ api: client, passcode: () => "p", storage: null });
+    const cb = callbacks();
+    expect(await session.readPage(IMAGE, cb, "the amount due")).toBe("ok");
+    expect(client.requests[0]).toMatchObject({ question: "the amount due", pageNumber: 1 });
+    expect(cb.calls).toEqual(["start:1", "answer:1:The amount due is $84.12.", "block:1:0", "done:1"]);
+    // With no question, none is sent.
+    const plain = api([META, { type: "done", blocks: 0 }]);
+    await new DocumentSession({ api: plain, passcode: () => "p", storage: null }).readPage(IMAGE, callbacks());
+    expect(plain.requests[0]).not.toHaveProperty("question");
   });
 
   it("does not use up the page number when the photo must be retaken", async () => {

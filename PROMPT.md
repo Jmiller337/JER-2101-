@@ -2,6 +2,8 @@
 
 **How to use this file.** Open Claude Code in a checkout of this repository and paste everything below the line as the first message. The repository is otherwise empty. The owner's answers to the design questions are already folded in, so the builder should not need to ask anything before starting.
 
+**Round 2.** After the first meeting with the person the app is for, `docs/PROMPT-2.md` changed the app: it answers what she asked (or says what the document is) before anything is read, she holds the screen to talk, photos are deleted once read, the speed goes back to 1 each launch, and Tone and Volume were added. The sections below have been updated to match; where anything still disagrees, `docs/PROMPT-2.md` wins.
+
 ---
 
 You are building a mobile web application that lets a blind person read paper documents with their iPhone. They hold the phone over a page, the app guides them by voice until the whole page is in view, takes the photo itself, sends it to Claude to read, and reads the text aloud with playback controls. They can add more pages and ask questions about the document.
@@ -31,7 +33,7 @@ Do not relitigate these. They came from the owner or from platform research done
 | Speech output | The phone's built-in speech (Web Speech API `speechSynthesis`), sentence by sentence | Free, no round trip to a server, most blind iPhone users already have an enhanced voice installed |
 | Capture | Spoken framing guidance and automatic capture when the page is fully in view and steady, plus a manual Capture button always on screen | This is what the owner asked for; the manual button is the safety net |
 | Features in version 1 | Playback controls, multi-page documents, handwriting, ask questions about the document | Chosen by the owner |
-| Not in version 1 | Document history, summaries before reading, describing pictures on the page, cloud voices, on-device OCR, a live "read whatever text is in view" mode for envelopes and labels | Excluded to keep scope tight; leave clean seams for them (they are the obvious version 2 features) |
+| Not in version 1 | Document history, summaries before reading, cloud voices, on-device OCR, a live "read whatever text is in view" mode for envelopes and labels | Excluded to keep scope tight; leave clean seams for them (they are the obvious version 2 features). Round 2 added a one-sentence description with the headline fact before reading (not a summary: it quotes the page) and a short description of photos and screenshots with little or no text |
 | Access control | One passcode stored in an environment variable, entered once on the phone | Enough for one trusted user |
 
 ## 3. Principles that override everything else
@@ -40,9 +42,9 @@ Do not relitigate these. They came from the owner or from platform research done
 2. **Nothing depends on seeing the screen.** Every state (waiting, framing, captured, reading, paused, error, page added) is announced. No decision requires reading text. No timeout expires silently.
 3. **One primary action per screen**, and it is the biggest thing on the screen.
 4. **Manual capture is always available** even while automatic capture is active, and it always works.
-5. **Honest about uncertainty.** Unreadable words are announced as unreadable. The app never invents text, never summarizes when asked to read, and says when an answer is not in the document.
+5. **Facts are never invented. Play reads every word; answers and the description sentence quote the page.** Unreadable words are announced as unreadable, and the app says when an answer is not in the document. (Round 2 removed "never summarizes": she asked to hear the one thing she wants, not the whole page, so the app now answers first and reads everything only on Play. The answer is still taken word for word from the page, never guessed.)
 6. **Fast to first word.** Speech should begin within a few seconds of capture. Measure the time from capture to first spoken word and keep it low. Never leave more than three seconds of silence without a cue (a short tone or a word).
-7. **Real semantics.** Native `<button>` elements with visible text labels, logical focus order, no custom swipe or multi-finger gestures (VoiceOver takes single taps and one-finger swipes for itself). Keyboard shortcuts are a bonus, not a substitute.
+7. **Real semantics.** Native `<button>` elements with visible text labels, logical focus order, no custom swipe or multi-finger gestures (VoiceOver takes single taps and one-finger swipes for itself). Keyboard shortcuts are a bonus, not a substitute. Two exceptions decided by the owner, both for read-aloud mode and both with buttons that do the same: a sideways swipe between the camera's modes, and holding anywhere on the screen to talk (VoiceOver mode has a Talk button instead).
 8. **Big targets and high contrast.** Minimum 64 by 64 CSS pixels for primary controls, 48 for secondary, contrast of at least 7:1 for text, large type, so a low-vision user or a sighted helper can also use it.
 9. **Keys stay on the server.** The Anthropic key never reaches the browser.
 10. **Small and boring.** Prefer the browser's built-in APIs over libraries. No OpenCV in version 1. Keep the client bundle small; the phone may be several years old.
@@ -100,7 +102,7 @@ The transcript fills the screen as real text: the title as `<h1>`, headings as `
 
 Spoken lines in read-aloud mode:
 
-- As soon as the meta line and the first block arrive, say the model's title line (for example *"A letter from Pacific Gas and Electric about your October bill."*), then read the text. If the model reported a warning (part of the page cut off, hard to read), say the warning after the title, then read what is available.
+- Round 2 (`docs/PROMPT-2.md` section 3): first the answer to what she asked before the photo, or, if she asked nothing, one sentence saying what the document is with its headline fact (for example *"This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026."*), then *"Hold the screen to ask something else, or press Play to hear everything."* (or *"What do you want to know? …"*). The text is read only when she presses Play or says "read everything". There is no warning line: the model never remarks on the photo.
 - If the model says the photo is unusable: say its reason (for example *"The picture is too blurry. Hold the phone still and try again."*), then return to the camera screen with automatic capture armed again.
 - *"Paused. Paragraph 3 of 7, page 1 of 2."* / *"Resuming."* / *"Speed one point five."* / *"Start of document."* / *"Page 2."* at a page boundary / *"End of document. Press Play to hear it again, Ask a question, or Add page."*
 - When a page is added while reading is still going, nothing extra is spoken; the new page is appended and reading continues into it with *"Page 2."* at the boundary. If reading had already finished: *"Page 2 added."* and reading continues from the start of that page.
@@ -123,13 +125,15 @@ A simple list of real controls, each announcing its new value when changed:
 
 - **How the app talks to you**: Read aloud (app voice) / VoiceOver (I use a screen reader). This is the first setting, with one explanatory sentence next to it.
 - **Voice**: voices available for the current language, with a **Preview** button.
-- **Speed**: 0.7 to 2.0 in steps of 0.1. Default 1.0.
+- **Speed**: 0.7 to 2.0 in steps of 0.1. Back to 1.0 each time the app opens (round 2).
+- **Tone** (the voice's pitch, 0.8 to 1.2) and **Volume** (0.5 to 1.0), in the Voice group (round 2).
+- **Privacy**: one row that is the privacy statement and reads it aloud (round 2).
 - **Automatic capture**: On / Off. Default On.
 - **Guidance**: Full / Minimal. Default Full.
 - **Sounds**: On / Off. Default On.
 - **Forget passcode** (button).
 
-All settings persist in `localStorage`.
+All settings persist in `localStorage`, except the speed.
 
 ## 5. Architecture
 

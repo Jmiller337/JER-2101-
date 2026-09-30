@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { expectAnnounced, expectSpoken, openMore, openToCamera, utterances } from "./helpers";
+import { expectAnnounced, expectSpoken, openMore, openToCamera, pressPlay, utterances } from "./helpers";
 
 const PDF = "tests/fixtures/pages/letter.pdf";
 const TITLE = "A two-page letter from Riverside Library about a returned book";
 
-test("a PDF from the phone's files is read aloud, every page, in order", async ({ page }) => {
+test("a PDF from the phone's files is described, then read aloud on Play, every page, in order", async ({ page }) => {
   await openToCamera(page);
   await page.getByRole("tab", { name: "PDF" }).click();
   await expectSpoken(page, "PDF. Tap the bottom of the screen to choose a file.");
@@ -15,7 +15,12 @@ test("a PDF from the phone's files is read aloud, every page, in order", async (
   await expect(page.getByRole("heading", { level: 1, name: TITLE })).toBeVisible();
   await expect(page.getByTestId("transcript")).toContainText("Late fee: $2.40.");
   await expect(page.getByRole("heading", { level: 2, name: "Page 2" })).toBeVisible();
+  await expectSpoken(page, "This is a two-page letter from Riverside Library about a returned book.");
+  await expectSpoken(page, "It asks you to pay a late fee of $2.40.");
+  await expectSpoken(page, "What do you want to know? Hold the screen to ask, or press Play to hear everything.");
+  expect(await utterances(page)).not.toContain(TITLE);
 
+  await pressPlay(page);
   await expectSpoken(page, TITLE);
   await expectSpoken(page, "Page 2.");
   await expectSpoken(page, "You can pay at the front desk or by phone at 555-0199.");

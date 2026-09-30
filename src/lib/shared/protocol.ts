@@ -47,6 +47,10 @@ export const LIMITS_TEXT = {
   title: 400,
   blockText: 8000,
   message: 400,
+  /** The short spoken answer that comes before the page's text. */
+  answer: 1200,
+  /** What the user asked for before the photo, such as "the amount due". */
+  question: 300,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -69,6 +73,16 @@ export interface BlockEvent {
   text: string;
 }
 
+/**
+ * The short spoken answer that comes before the page's text: the answer to the question sent with
+ * the photo, or, when none was asked, one sentence saying what the document is with its headline
+ * fact. Always taken from the page.
+ */
+export interface AnswerEvent {
+  type: "answer";
+  text: string;
+}
+
 export interface DoneEvent {
   type: "done";
   blocks: number;
@@ -86,7 +100,7 @@ export interface PageEvent {
   number: number;
 }
 
-export type ReadEvent = MetaEvent | BlockEvent | PageEvent | DoneEvent | ErrorEvent;
+export type ReadEvent = MetaEvent | AnswerEvent | BlockEvent | PageEvent | DoneEvent | ErrorEvent;
 
 // ---------------------------------------------------------------------------
 // Streamed events from POST /api/ask
@@ -114,6 +128,8 @@ export interface ReadRequest {
   /** The number the first page read will get in the document. */
   pageNumber: number;
   languageHint?: string | null;
+  /** What the user wants to know from this page, asked before the photo was taken. */
+  question?: string;
 }
 
 export interface ChatTurn {
@@ -176,6 +192,9 @@ export function parseReadEvent(value: unknown): ReadEvent | null {
       if (typeof value.problem === "string") meta.problem = value.problem;
       return meta;
     }
+    case "answer":
+      if (!isString(value.text, 1, LIMITS_TEXT.answer)) return null;
+      return { type: "answer", text: value.text };
     case "block":
       if (!includes(BLOCK_KINDS, value.kind) || !isString(value.text, 1, LIMITS_TEXT.blockText)) return null;
       return { type: "block", kind: value.kind, text: value.text };

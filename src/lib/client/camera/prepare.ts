@@ -6,8 +6,6 @@ export interface PreparedImage {
   width: number;
   height: number;
   bytes: number;
-  /** The JPEG itself, kept in memory with the page (never stored). */
-  blob?: Blob;
   /** The photo was dim or faded and was brightened before sending. */
   enhanced?: boolean;
 }
@@ -52,7 +50,8 @@ export async function prepareImage(source: CanvasImageSource, width: number, hei
   // Release the canvas memory promptly; iOS limits total canvas memory.
   canvas.width = 0;
   canvas.height = 0;
-  return { base64, mediaType: "image/jpeg", width: size.width, height: size.height, bytes: blob.size, blob, enhanced };
+  // Only the base64 copy goes on, to be sent once; the JPEG itself is not kept.
+  return { base64, mediaType: "image/jpeg", width: size.width, height: size.height, bytes: blob.size, enhanced };
 }
 
 export async function blobToBase64(blob: Blob): Promise<string> {

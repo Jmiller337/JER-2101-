@@ -10,6 +10,8 @@ export interface PageReadCallbacks {
   /** The model could not read the photo; the page number is not used up. */
   onRetry(problem: string): void;
   onPageStart(page: DocPage, meta: MetaEvent): void;
+  /** The short spoken answer that comes before the text (docs/PROMPT-2.md section 3). */
+  onAnswer(page: DocPage, text: string): void;
   onBlock(page: DocPage, index: number, block: DocBlock): void;
   onPageDone(page: DocPage): void;
   /** `page` is null when the failure happened before any text arrived. */
@@ -38,8 +40,9 @@ export interface PreparedPdf {
 
 /**
  * Owns the current document and runs page reads: sends the photo, turns the streamed events
- * into pages and blocks, and reports progress through callbacks. Keeps the document (without
- * images) in sessionStorage.
+ * into pages and blocks, and reports progress through callbacks. Keeps the document's text in
+ * sessionStorage until New document or the tab closes. The photo is never kept: once it has been
+ * sent, nothing holds on to it.
  */
 export class DocumentSession {
   readonly store: Store<SessionState>;
@@ -102,20 +105,20 @@ export class DocumentSession {
     this.changed();
   }
 
-  /** Reads one photographed page. */
-  readPage(image: PreparedImage, cb: PageReadCallbacks): Promise<ReadOutcome> {
-    return this.read({ image: { mediaType: image.mediaType, data: image.base64 } }, image.blob ?? null, cb);
+  /** Reads one photographed page, answering `question` first when there is one. */
+  readPage(image: PreparedImage, cb: PageReadCallbacks, question?: string | null): Promise<ReadOutcome> {
+    return this.read({ image: { mediaType: image.mediaType, data: image.base64 } }, cb, question);
   }
 
   /** Reads a whole PDF: its pages arrive one after another in the same stream. */
-  readPdf(pdf: PreparedPdf, cb: PageReadCallbacks): Promise<ReadOutcome> {
-    return this.read({ pdf: { data: pdf.base64 } }, null, cb);
+  readPdf(pdf: PreparedPdf, cb: PageReadCallbacks, question?: string | null): Promise<ReadOutcome> {
+    return this.read({ pdf: { data: pdf.base64 } }, cb, question);
   }
 
   private async read(
     source: Pick<ReadRequest, "image" | "pdf">,
-    imageBlob: Blob | null,
     cb: PageReadCallbacks,
+    question?: string | null,
   ): Promise<ReadOutcome> {
     const isPdf = Boolean(source.pdf);
     const pageNumber = this.nextPageNumber;
@@ -145,6 +148,7 @@ export class DocumentSession {
           ...source,
           pageNumber,
           languageHint: this.doc?.language ?? null,
+          ...(question ? { question } : {}),
         },
         passcode,
         (event) => {
@@ -166,7 +170,6 @@ export class DocumentSession {
                 title: event.title,
                 blocks: [],
                 complete: false,
-                ...(imageBlob ? { image: imageBlob } : {}),
                 ...(isPdf ? { fromPdf: true } : {}),
               };
               this.addPage(page);
@@ -190,6 +193,11 @@ export class DocumentSession {
               };
               this.addPage(page);
               cb.onPageStart(page, { ...meta, title: "" });
+              return;
+            }
+            case "answer": {
+              if (!page) return;
+              cb.onAnswer(page, event.text);
               return;
             }
             case "block": {
