@@ -48,7 +48,8 @@ The answer line is spoken first and on its own; the text that follows is read on
   form: whether anything is due or must be signed.
   prescription or medical paper: what it is and who it is from, without doses.
   anything else: what it is and who it is from.
-  For example: "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026." If the headline fact is not written there, say what it is and stop.`;
+  For example: "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026." If the headline fact is not written there, say what it is and stop.
+- The answer line never replaces the text. After it, always write every block of the page, whether or not a question was asked and whatever the answer was: the listener presses Play to hear all of it. An answer line followed by no blocks is wrong.`;
 
 const PICTURE_RULE = `- A photo or screenshot of a picture, a screen, or a scene with little or no text: describe what it shows in one or two plain sentences in a note block, then read any text that is there. Describe people by what they are doing and wearing; never guess who they are.`;
 

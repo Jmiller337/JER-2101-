@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { ASK_SYSTEM_PROMPT, READ_PDF_SYSTEM_PROMPT, READ_SYSTEM_PROMPT, readPdfUserText, readUserText } from "@/lib/server/prompts";
 
+// After the answer line the whole page must still follow: Play reads it, and questions use it.
+describe("the answer line", () => {
+  for (const [name, prompt] of [
+    ["photo", READ_SYSTEM_PROMPT],
+    ["PDF", READ_PDF_SYSTEM_PROMPT],
+  ] as const) {
+    it(`the ${name} prompt says the answer line never replaces the text`, () => {
+      expect(prompt).toContain("The answer line never replaces the text.");
+      expect(prompt).toContain("always write every block of the page, whether or not a question was asked");
+      expect(prompt).toContain("An answer line followed by no blocks is wrong.");
+    });
+  }
+});
+
 /** Where the prompt starts describing the page's blocks. */
 const BLOCK_START = '{"type":"block"';
 
