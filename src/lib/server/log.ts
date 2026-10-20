@@ -19,6 +19,10 @@ export interface RequestLog {
   imageChars?: number;
   /** A question came with the photo (its words are never logged). */
   asked?: boolean;
+  /** The speed the call ran at, as the API reports it. */
+  speed?: string | null;
+  /** How many attempts the call took (see attempts.ts). */
+  attempts?: number;
 }
 
 export function logRequest(entry: RequestLog): void {

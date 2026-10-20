@@ -24,7 +24,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "fixtures": "tsx scripts/make-fixtures.ts",
-    "check:real-api": "tsx scripts/real-api-check.ts"
+    "check:real-api": "tsx scripts/real-api-check.ts",
+    "rehearse": "tsx scripts/demo-rehearsal.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",

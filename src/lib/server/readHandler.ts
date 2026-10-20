@@ -2,31 +2,46 @@ import { toNdjsonLine } from "@/lib/shared/ndjson";
 import { spokenError } from "@/lib/shared/messages";
 import type { ReadEvent, ReadRequest } from "@/lib/shared/protocol";
 import { ReadRequestSchema } from "./schemas";
-import { FALLBACK_BETA, type ModelMessage, type StreamParams } from "./anthropic";
+import { FALLBACK_BETA, FAST_MODE_BETA, type ModelMessage, type StreamParams } from "./anthropic";
+import { streamWithAttempts, type Attempt } from "./attempts";
 import { checkRequest } from "./auth";
 import { readJsonBody } from "./body";
-import { LIMITS, type ServerEnv } from "./config";
+import { CACHE_TTL, LIMITS, type ServerEnv, type Speed } from "./config";
 import type { HandlerDeps } from "./deps";
 import { classifyModelError, describeError } from "./errors";
 import { jsonResponse, NDJSON_HEADERS } from "./http";
 import { ModelOutputParser } from "./modelOutput";
 import { readPdfSystemPrompt, readPdfUserText, readSystemPrompt, readUserText } from "./prompts";
 
-/** The Messages API request for reading one page or one PDF (PROMPT.md sections 6.5 and 7). */
-export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamParams {
+/** The request parts shared by reading and answering: fallbacks, and fast mode when asked for. */
+export function commonParams(speed: Speed): Pick<StreamParams, "betas" | "fallbacks" | "speed"> {
+  return {
+    betas: speed === "fast" ? [FALLBACK_BETA, FAST_MODE_BETA] : [FALLBACK_BETA],
+    fallbacks: "default",
+    ...(speed === "fast" ? { speed: "fast" as const } : {}),
+  };
+}
+
+/**
+ * The Messages API request for reading one page or one PDF (PROMPT.md sections 6.5 and 7). The
+ * system prompt is the same for every read, so it is cached for an hour: each read after the
+ * first starts a little sooner.
+ */
+export function buildReadParams(env: ServerEnv, request: ReadRequest, speed: Speed = env.speed): StreamParams {
   const common = {
     model: env.readModel,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default" as const,
-    // Full effort: a page must be transcribed to the last line. Lower settings shorten the
-    // output, which for a transcription means words left out.
-    output_config: { effort: "high" as const },
+    ...commonParams(speed),
+    // High effort by default: a page must be transcribed to the last line, and every fact in
+    // the answer line must come from the page. Lower settings shorten the output, which for
+    // a transcription means words left out.
+    output_config: { effort: env.readEffort },
   };
+  const system = (text: string) => [{ type: "text" as const, text, cache_control: { type: "ephemeral" as const, ttl: CACHE_TTL } }];
   if (request.pdf) {
     return {
       ...common,
       max_tokens: LIMITS.maxPdfTokens,
-      system: readPdfSystemPrompt(env.translateFrom),
+      system: system(readPdfSystemPrompt(env.translateFrom)),
       messages: [
         {
           role: "user",
@@ -43,7 +58,7 @@ export function buildReadParams(env: ServerEnv, request: ReadRequest): StreamPar
   return {
     ...common,
     max_tokens: LIMITS.maxTokens,
-    system: readSystemPrompt(env.translateFrom),
+    system: system(readSystemPrompt(env.translateFrom)),
     messages: [
       {
         role: "user",
@@ -89,12 +104,14 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
 
   const abort = new AbortController();
   req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
-  const parser = new ModelOutputParser({
-    languageHint: request.languageHint,
-    firstPage: request.pageNumber,
-    multiPage: Boolean(request.pdf),
-    translateFrom: deps.env.translateFrom,
-  });
+  const newParser = () =>
+    new ModelOutputParser({
+      languageHint: request.languageHint,
+      firstPage: request.pageNumber,
+      multiPage: Boolean(request.pdf),
+      translateFrom: deps.env.translateFrom,
+    });
+  let parser = newParser();
   const encoder = new TextEncoder();
   let firstEventMs: number | null = null;
 
@@ -116,14 +133,25 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
     let outcome = "ok";
     let code: string | undefined;
     let final: ModelMessage | undefined;
+    let attempt: Attempt | undefined;
+    let attempts = 0;
     try {
-      const stream = deps.client().stream(buildReadParams(deps.env, request), { signal: abort.signal });
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          send(parser.push(event.delta.text));
-        }
-      }
-      final = await stream.finalMessage();
+      const result = await streamWithAttempts({
+        attempts: deps.speed.attempts(deps.env.speed),
+        policy: deps.speed,
+        start: (next) =>
+          deps.client().stream(buildReadParams(deps.env, request, next.speed), { signal: abort.signal, maxRetries: next.maxRetries }),
+        begin: (next, index) => {
+          attempt = next;
+          attempts = index + 1;
+          // A failed attempt may have left half a line in the parser: start again clean.
+          if (index > 0) parser = newParser();
+        },
+        onText: (text) => send(parser.push(text)),
+        committed: () => firstEventMs !== null,
+        aborted: () => abort.signal.aborted,
+      });
+      final = result.final;
       if (final.stop_reason === "refusal") {
         // Every model in the fallback chain declined. Partial text already sent stays sent;
         // the phone announces the error and stops treating the page as complete.
@@ -162,6 +190,9 @@ export async function handleRead(req: Request, deps: HandlerDeps): Promise<Respo
         dropped: stats.dropped,
         parserMode: stats.mode,
         asked: Boolean(request.question),
+        speed: final?.usage.speed ?? attempt?.speed ?? null,
+        attempts,
+        cacheWriteTokens: final?.usage.cache_creation_input_tokens ?? null,
         imageChars: request.image?.data.length,
         pdfChars: request.pdf?.data.length,
         pages: stats.pages,

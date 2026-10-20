@@ -1,4 +1,5 @@
 import { createAnthropicModelClient, type ModelClient } from "./anthropic";
+import { SpeedPolicy } from "./attempts";
 import { serverEnv, type ServerEnv } from "./config";
 import { createFakeModelClient } from "./fakeModel";
 import { logRequest, type RequestLog } from "./log";
@@ -10,9 +11,12 @@ export interface HandlerDeps {
   client: () => ModelClient;
   log: (entry: RequestLog) => void;
   now: () => number;
+  /** Which speeds to try, and the memory of fast mode being refused. Shared by every request. */
+  speed: SpeedPolicy;
 }
 
 let cachedClient: ModelClient | null = null;
+const speedPolicy = new SpeedPolicy();
 let warnedAboutFake = false;
 
 /**
@@ -48,5 +52,6 @@ export function defaultDeps(): HandlerDeps {
     },
     log: logRequest,
     now: Date.now,
+    speed: speedPolicy,
   };
 }

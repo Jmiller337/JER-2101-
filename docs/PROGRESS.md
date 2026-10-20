@@ -208,8 +208,19 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 - **Not verified** with the real model or a real French letter: no API key in the build environment. Run `npm run check:real-api` with `TRANSLATE_FROM=fr` on a French letter before switching it on.
 - The reading screen shows "Translated from French" in the small capsule under the title; no control was added or moved.
 
+## Set up for the demo
+
+- **Fast mode first, standard behind it.** Every read and question asks for the model's fast mode (same model, faster output; a research preview with its own rate limits). If the API refuses it or is busy, the request carries on at standard speed before the phone has heard anything; a refusal sets fast mode aside for the rest of the process. `MODEL_SPEED=standard` turns it off.
+- **High effort for both reading and questions** (was medium for questions): she would rather wait a moment for a careful answer. `READ_EFFORT` and `ASK_EFFORT` change it.
+- **A second and third attempt** before the first word: a failure before anything has reached the phone starts over, so a busy moment at the API does not become a spoken error. Once she has heard something, nothing starts over.
+- **One-hour prompt caches** for the reading instructions and the document's words.
+- **The Fly machine stays running** (`min_machines_running = 1`), so there is no start-up pause.
+- **`npm run rehearse`** reads the test bill and PDF through the real API and checks the answers word for word (the amount due, the account number, the late fee, two questions, the PDF's two pages), printing the time to the first word and the speed used. Run it within the hour before the demo: it also warms the caches.
+- **Not verified here:** no API key in the build environment, so fast mode and the real timings have only been exercised against the scripted model. The rehearsal is what shows them.
+
 ## What still needs the owner
 
+0. **Run `npm run rehearse` within the hour before the demo** (`docs/SETUP.md`, "Before the demo"), and pull and deploy first.
 1. **An API key in the build environment, or a run of `npm run check:real-api` on your computer.** No Anthropic key was available where the app was built, so it has never read a real photo. Everything up to the model call is tested with a scripted model. The first real run will show the time to first word, the cost per page, and whether the read prompt behaves as expected on real photos (see `docs/SETUP.md` section 5).
 2. **Deploying** to Vercel or Fly.io and setting `ANTHROPIC_API_KEY` and `APP_PASSCODE` (`docs/SETUP.md` section 2).
 3. **The manual iPhone checklist** (`docs/TESTING-ON-IPHONE.md`) with the user, including the checks that only a real iPhone can answer: that direction cues point the right way, that hand tremor does not block automatic capture, that speech is heard with the silent switch on, the flashlight, the phone call and screen lock behavior, and how VoiceOver reads the transcript.

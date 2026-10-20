@@ -13,6 +13,7 @@
  */
 import { readFileSync } from "node:fs";
 import { createAnthropicModelClient } from "../src/lib/server/anthropic";
+import { SpeedPolicy } from "../src/lib/server/attempts";
 import { createFakeModelClient } from "../src/lib/server/fakeModel";
 import { serverEnv } from "../src/lib/server/config";
 import type { HandlerDeps } from "../src/lib/server/deps";
@@ -41,7 +42,14 @@ async function main(): Promise<void> {
   const env = { ...serverEnv(), passcode: "local-check" };
   const client = dryRun ? createFakeModelClient() : createAnthropicModelClient();
   if (dryRun) console.log("Dry run with the scripted test model (FAKE_MODEL=1); no API calls are made.");
-  const deps: HandlerDeps = { env, modelConfigured: true, client: () => client, log: (entry) => logs.push(entry), now: Date.now };
+  const deps: HandlerDeps = {
+    env,
+    modelConfigured: true,
+    client: () => client,
+    log: (entry) => logs.push(entry),
+    now: Date.now,
+    speed: new SpeedPolicy(),
+  };
 
   const request = new Request("http://localhost/api/read", {
     method: "POST",

@@ -29,13 +29,19 @@ describe("POST /api/ask", () => {
       ],
     });
     expect(params.model).toBe("claude-opus-5-5");
-    expect(params.output_config).toEqual({ effort: "medium" });
+    expect(params.output_config).toEqual({ effort: "high" });
     expect(params.fallbacks).toBe("default");
-    expect(params.betas).toEqual(["server-side-fallback-2026-07-01"]);
+    expect(params.betas).toEqual(["server-side-fallback-2026-07-01", "fast-mode-2026-02-01"]);
+    expect(params.speed).toBe("fast");
+    expect(buildAskParams({ ...TEST_ENV, askEffort: "medium" }, BODY, "standard")).toMatchObject({
+      betas: ["server-side-fallback-2026-07-01"],
+      output_config: { effort: "medium" },
+    });
+    expect(buildAskParams(TEST_ENV, BODY, "standard")).not.toHaveProperty("speed");
     const system = params.system as Array<{ text: string; cache_control?: unknown }>;
     expect(system).toHaveLength(2);
     expect(system[0]!.cache_control).toBeUndefined();
-    expect(system[1]!.cache_control).toEqual({ type: "ephemeral" });
+    expect(system[1]!.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
     expect(system[1]!.text).toContain('<page number="2">');
     expect(system[1]!.text).toContain("Amount due: $84.12.");
     expect(params.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
@@ -67,12 +73,23 @@ describe("POST /api/ask", () => {
     expect(events).toEqual([expect.objectContaining({ type: "error", code: "empty" })]);
   });
 
-  it("maps API errors", async () => {
+  it("maps API errors, and does not try again once part of the answer has been heard", async () => {
     const error = new Anthropic.InternalServerError(529, { type: "error", error: { type: "overloaded_error" } }, "busy", new Headers());
     const deps = makeDeps({ chunks: ["Partial"], failAfterChunks: 1, error });
     const events = await readNdjson(await handleAsk(postJson("/api/ask", BODY), deps));
     expect(events.map((e) => e.type)).toEqual(["text", "error"]);
     expect(events[1]).toMatchObject({ code: "overloaded" });
+    expect(deps.calls).toHaveLength(1);
+  });
+
+  it("tries again at standard speed when the fast attempt fails before any of the answer", async () => {
+    const error = new Anthropic.InternalServerError(529, { type: "error", error: { type: "overloaded_error" } }, "busy", new Headers());
+    let calls = 0;
+    const deps = makeDeps(() => (++calls === 1 ? { chunks: [], failAfterChunks: 0, error } : { chunks: ["Yes."] }));
+    const events = await readNdjson(await handleAsk(postJson("/api/ask", BODY), deps));
+    expect(events).toEqual([{ type: "text", text: "Yes." }, { type: "done" }]);
+    expect(deps.calls.map((c) => c.speed)).toEqual(["fast", undefined]);
+    expect(deps.logs[0]).toMatchObject({ outcome: "ok", attempts: 2, speed: "standard" });
   });
 
   it("validates the passcode and the body", async () => {

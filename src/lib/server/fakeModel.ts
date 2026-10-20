@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ModelClient, ModelMessage, ModelStream, ModelStreamEvent, StreamParams } from "./anthropic";
+import type { ModelClient, ModelMessage, ModelStream, ModelStreamEvent, StreamOptions, StreamParams } from "./anthropic";
 
 /**
  * A scripted stand-in for the Anthropic API, used by route tests and by the end-to-end tests
@@ -222,7 +222,7 @@ function askScript(question: string): FakeScript {
 
 export function createFakeModelClient(): ModelClient {
   return {
-    stream(params: StreamParams, options?: { signal?: AbortSignal }): ModelStream {
+    stream(params: StreamParams, options?: StreamOptions): ModelStream {
       const first = params.messages[0];
       const content = Array.isArray(first?.content) ? first.content : [];
       const text = content.find((part) => part.type === "text");

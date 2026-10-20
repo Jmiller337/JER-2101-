@@ -2,14 +2,16 @@ import { spokenError } from "@/lib/shared/messages";
 import { toNdjsonLine } from "@/lib/shared/ndjson";
 import type { AskEvent, AskRequest, ChatTurn, ErrorCode } from "@/lib/shared/protocol";
 import { AskRequestSchema } from "./schemas";
-import { FALLBACK_BETA, type ModelMessage, type StreamParams } from "./anthropic";
+import type { ModelMessage, StreamParams } from "./anthropic";
+import { streamWithAttempts, type Attempt } from "./attempts";
 import { checkRequest } from "./auth";
 import { readJsonBody } from "./body";
-import { LIMITS, type ServerEnv } from "./config";
+import { CACHE_TTL, LIMITS, type ServerEnv, type Speed } from "./config";
 import type { HandlerDeps } from "./deps";
 import { classifyModelError, describeError } from "./errors";
 import { jsonResponse, NDJSON_HEADERS } from "./http";
 import { ASK_SYSTEM_PROMPT, transcriptForAsk } from "./prompts";
+import { commonParams } from "./readHandler";
 
 /** The last ten turns, starting with a question (the API requires the first message to be the user's). */
 export function trimHistory(history: ChatTurn[]): ChatTurn[] {
@@ -18,18 +20,21 @@ export function trimHistory(history: ChatTurn[]): ChatTurn[] {
   return firstUser === -1 ? [] : recent.slice(firstUser);
 }
 
-/** The Messages API request for one question (PROMPT.md sections 6.6 and 7). */
-export function buildAskParams(env: ServerEnv, request: AskRequest): StreamParams {
+/**
+ * The Messages API request for one question (PROMPT.md sections 6.6 and 7). High effort by
+ * default: she would rather wait a moment for a careful answer (docs/PROMPT-2.md section 7).
+ */
+export function buildAskParams(env: ServerEnv, request: AskRequest, speed: Speed = env.speed): StreamParams {
   return {
     model: env.askModel,
     max_tokens: LIMITS.maxTokens,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    output_config: { effort: "medium" },
+    ...commonParams(speed),
+    output_config: { effort: env.askEffort },
     system: [
       { type: "text", text: ASK_SYSTEM_PROMPT },
-      // The transcript is identical for every question about this document, so it is cached.
-      { type: "text", text: transcriptForAsk(request.title, request.pages), cache_control: { type: "ephemeral" } },
+      // The transcript is identical for every question about this document, so it is cached,
+      // for an hour: every question after the first starts sooner.
+      { type: "text", text: transcriptForAsk(request.title, request.pages), cache_control: { type: "ephemeral", ttl: CACHE_TTL } },
     ],
     messages: [
       ...trimHistory(request.history).map((turn) => ({ role: turn.role, content: turn.content })),
@@ -91,16 +96,28 @@ export async function handleAsk(req: Request, deps: HandlerDeps): Promise<Respon
     let outcome = "ok";
     let code: string | undefined;
     let final: ModelMessage | undefined;
+    let attempt: Attempt | undefined;
+    let attempts = 0;
     let chars = 0;
     try {
-      const stream = deps.client().stream(buildAskParams(deps.env, request), { signal: abort.signal });
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta" && event.delta.text) {
-          chars += event.delta.text.length;
-          send({ type: "text", text: event.delta.text });
-        }
-      }
-      final = await stream.finalMessage();
+      const result = await streamWithAttempts({
+        attempts: deps.speed.attempts(deps.env.speed),
+        policy: deps.speed,
+        start: (next) =>
+          deps.client().stream(buildAskParams(deps.env, request, next.speed), { signal: abort.signal, maxRetries: next.maxRetries }),
+        begin: (next, index) => {
+          attempt = next;
+          attempts = index + 1;
+        },
+        onText: (text) => {
+          if (!text) return;
+          chars += text.length;
+          send({ type: "text", text });
+        },
+        committed: () => chars > 0,
+        aborted: () => abort.signal.aborted,
+      });
+      final = result.final;
       if (final.stop_reason === "refusal") {
         outcome = "refusal";
         code = "refusal";
@@ -135,6 +152,8 @@ export async function handleAsk(req: Request, deps: HandlerDeps): Promise<Respon
         outputTokens: final?.usage.output_tokens,
         cacheReadTokens: final?.usage.cache_read_input_tokens ?? null,
         cacheWriteTokens: final?.usage.cache_creation_input_tokens ?? null,
+        speed: final?.usage.speed ?? attempt?.speed ?? null,
+        attempts,
       });
       if (open) {
         open = false;

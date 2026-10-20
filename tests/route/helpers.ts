@@ -1,4 +1,5 @@
 import type { ModelClient, StreamParams } from "@/lib/server/anthropic";
+import { SpeedPolicy } from "@/lib/server/attempts";
 import type { ServerEnv } from "@/lib/server/config";
 import type { HandlerDeps } from "@/lib/server/deps";
 import { FakeModelStream, type FakeScript } from "@/lib/server/fakeModel";
@@ -13,6 +14,9 @@ export const TEST_ENV: ServerEnv = {
   askModel: "claude-opus-5-5",
   extraAllowedHosts: [],
   translateFrom: [],
+  speed: "fast",
+  readEffort: "high",
+  askEffort: "high",
 };
 
 /** A small valid base64 payload (the handler never decodes it; the fake model ignores it). */
@@ -38,6 +42,7 @@ export function makeDeps(script: FakeScript | (() => FakeScript), overrides: Par
     client: () => client,
     log: (entry) => logs.push(entry),
     now: Date.now,
+    speed: new SpeedPolicy(),
     ...overrides,
     logs,
     calls,

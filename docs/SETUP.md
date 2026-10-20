@@ -145,6 +145,26 @@ It prints when the title would start being spoken, the time to the first paragra
 
 The server logs one line per request with timings, token counts, and the outcome (never the document text): Vercel project, **Logs**; or `fly logs`.
 
+### Before the demo
+
+The server is set up for a live demo, where speed and care matter more than cost:
+
+- **Fast mode** (the same model with faster output) is asked for first on every read and question. If the API refuses it or its pool is busy, the request goes on at standard speed by itself, and the app never waits on it. `MODEL_SPEED=standard` turns it off.
+- **High effort** for reading a page and for answering a question (`READ_EFFORT`, `ASK_EFFORT`: `low`, `medium`, `high`, `xhigh`, `max`). Higher is more careful and slower to the first word.
+- A request that fails before the first word reaches the phone is **tried again** (up to three attempts); once she has heard something, the app never starts over.
+- The reading instructions and the document's words are **cached for an hour**, so every read and question after the first starts sooner.
+- One Fly machine **stays running** (`min_machines_running = 1` in `fly.toml`), so the app never has to start up during the demo.
+
+Less than an hour before the demo, on your computer, with the same key the server uses:
+
+```
+ANTHROPIC_API_KEY=your-key npm run rehearse
+```
+
+It reads the test bill the way the phone does, asks for the amount due, the account number, and the late fee, asks two questions, and reads the test PDF, then prints PASS or FAIL for each with the time to the first word and the speed the API used. It also warms the caches for the hour. If a check fails, the answer it printed shows what went wrong. If it says fast mode was refused, the app works at standard speed; nothing needs changing.
+
+Also deploy at least once with `fly deploy --ha=false` after pulling, and open the app on the phone once before the demo starts.
+
 ### Translating French documents (built, switched off)
 
 The app can read a letter written in French in English: it says "Translated from French." first, then answers and reads in English, with names, addresses, amounts, and numbers kept exactly as printed. It is **off** until you switch it on, and nothing changes on the phone while it is off.

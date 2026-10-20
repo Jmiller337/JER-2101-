@@ -9,6 +9,9 @@ const env: ServerEnv = {
   askModel: "m",
   extraAllowedHosts: ["reader.example.dev"],
   translateFrom: [],
+  speed: "standard",
+  readEffort: "high",
+  askEffort: "high",
 };
 
 function request(headers: Record<string, string>): Request {

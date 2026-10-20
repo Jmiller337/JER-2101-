@@ -14,12 +14,12 @@ primary_region = "sjc"
 [http_service]
   internal_port = 3000
   force_https = true
-  # Stop the machine when nobody is using the app, and start it again on the next visit.
-  # The first page load after a pause then takes a few extra seconds. To avoid that, set
-  # min_machines_running = 1 (a small machine costs a few dollars a month).
+  # One machine always stays running, so the app never has to start up (several seconds) on the
+  # first visit after a pause. A small machine costs a few dollars a month; to save it, set
+  # min_machines_running = 0 and the machine stops when nobody is using the app.
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   [http_service.concurrency]
     type = "requests"
