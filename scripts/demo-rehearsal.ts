@@ -106,6 +106,11 @@ async function main(): Promise<void> {
   check("what it is, with no question", r.answer, [/Riverside Water/i, /84\.12/], r);
   const transcript = r.text;
   const title = r.title;
+  // The whole page must follow the answer: Play reads it, and questions are answered from it.
+  check("the page's text arrived after the answer", transcript, [/84\.12/, /555-0142/], {
+    ...r,
+    firstWordMs: null,
+  });
 
   // The scripted model does not know these two facts: in a dry run it must say so.
   console.log("3. The account number...");
@@ -146,10 +151,14 @@ async function main(): Promise<void> {
   for (const o of outcomes) {
     if (!o.ok) failed += 1;
     const speed = o.log?.speed ? `, ${o.log.speed}` : "";
+    const server =
+      o.log && o.log.route === "read"
+        ? `, server: ${o.log.blocks ?? 0} text lines, ${o.log.dropped ?? 0} dropped, ${o.log.parserMode}, stop ${o.log.stopReason}, ${o.log.outputTokens ?? "?"} out tokens`
+        : "";
     const attempts = o.log && o.log.attempts && o.log.attempts > 1 ? `, ${o.log.attempts} attempts` : "";
     const cache = o.log?.cacheReadTokens ? `, cache read ${o.log.cacheReadTokens}` : "";
     const timing = o.firstWordMs !== null ? `first word ${o.firstWordMs} ms, total ${o.totalMs} ms` : `total ${o.totalMs} ms`;
-    console.log(`  ${o.ok ? "PASS" : "FAIL"}  ${o.name}  (${timing}${speed}${attempts}${cache})`);
+    console.log(`  ${o.ok ? "PASS" : "FAIL"}  ${o.name}  (${timing}${speed}${attempts}${cache}${server})`);
     console.log(`        ${o.detail}`);
   }
   const slow = outcomes.filter((o) => o.firstWordMs !== null && o.firstWordMs > 8000);
