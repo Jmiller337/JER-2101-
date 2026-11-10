@@ -23,7 +23,8 @@ export const viewport: Viewport = {
 
 /**
  * Runs before the app's own code, in syntax every browser understands.
- * - Applies the saved colour theme before the first paint, so the page never flashes.
+ * - Applies the saved colour theme, and Invert colours, before the first paint, so the page
+ *   never flashes.
  * - Shows focus rings only to keyboard users (a Bluetooth keyboard); touch and VoiceOver users
  *   never see a box drawn around the heading the app moves focus to.
  * - If the app never starts (a phone too old for its code, or a download that failed), tapping
@@ -37,6 +38,7 @@ const STARTUP_FALLBACK = `(function () {
     if (saved && (saved.theme === "light" || saved.theme === "dark" || saved.theme === "contrast")) {
       root.setAttribute("data-theme", saved.theme);
     }
+    if (saved && saved.invert === true) root.setAttribute("data-invert", "");
   } catch (e) {}
   document.addEventListener("keydown", function (event) {
     if (!event.metaKey && !event.ctrlKey && !event.altKey) root.setAttribute("data-keyboard", "1");

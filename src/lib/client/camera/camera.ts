@@ -232,3 +232,46 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     );
   });
 }
+
+/** How long the preview may stand still before the camera is nudged, then restarted. */
+export const FREEZE = { nudgeMs: 1500, restartMs: 3000, restartGapMs: 6000 } as const;
+
+/**
+ * Notices a frozen camera picture. iOS can stop a camera's frames without ending the track:
+ * when the microphone starts listening, after a photo, or after a call. The video's clock then
+ * stops moving. A first freeze gets a nudge (play the video again); a longer one, or a track
+ * that ended, means starting the camera again.
+ */
+export class FreezeWatch {
+  private lastTime = -1;
+  private stillSince: number | null = null;
+  private lastRestart = -Infinity;
+  private nudged = false;
+
+  reset(): void {
+    this.lastTime = -1;
+    this.stillSince = null;
+    this.nudged = false;
+  }
+
+  check(videoTime: number, ended: boolean, now: number): "ok" | "nudge" | "restart" {
+    if (videoTime !== this.lastTime) {
+      this.lastTime = videoTime;
+      this.stillSince = null;
+      this.nudged = false;
+      if (!ended) return "ok";
+    }
+    this.stillSince ??= now;
+    const still = now - this.stillSince;
+    if ((ended || still >= FREEZE.restartMs) && now - this.lastRestart >= FREEZE.restartGapMs) {
+      this.lastRestart = now;
+      this.reset();
+      return "restart";
+    }
+    if (!ended && !this.nudged && still >= FREEZE.nudgeMs) {
+      this.nudged = true;
+      return "nudge";
+    }
+    return "ok";
+  }
+}

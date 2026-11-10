@@ -2,17 +2,10 @@
 
 import { useRef, type ReactNode } from "react";
 import { PRIVACY_STATEMENT } from "@/lib/client/controller";
-import {
-  PITCH_MAX,
-  PITCH_MIN,
-  RATE_MAX,
-  RATE_MIN,
-  RATE_STEP,
-  THEME_NAMES,
-  VOLUME_MAX,
-  VOLUME_MIN,
-  type Theme,
-} from "@/lib/client/settings";
+import { RATE_STEP, THEME_NAMES, type Theme } from "@/lib/client/settings";
+
+/** Tone and volume change by a tenth at a time. */
+const STEP = 0.1;
 import { betterVoiceAvailable } from "@/lib/client/speech/voices";
 import { useController, useFocusRequest, useStore } from "../hooks";
 import { CheckIcon, FasterIcon, SlowerIcon, SpeakerIcon } from "../icons";
@@ -42,27 +35,15 @@ export function SettingsScreen() {
       <NavBar title="Settings" headingRef={headingRef} onDone={() => controller.closeSettings()} />
       <div className="flex flex-col gap-8 px-4 pt-4 pb-12">
         <Group id="speed" title="Speed" footer="Speed goes back to 1 each time the app opens.">
-          <div className="flex flex-col gap-3 p-4">
-            <label htmlFor="speed" className="flex items-baseline justify-between gap-3 text-xl">
-              <span>Reading speed</span>
-              <span className="font-bold">{settings.rate.toFixed(1)}</span>
-            </label>
-            <input
-              id="speed"
-              type="range"
-              min={RATE_MIN}
-              max={RATE_MAX}
-              step={RATE_STEP}
-              value={settings.rate}
-              aria-valuetext={`Speed ${settings.rate.toFixed(1)}`}
-              onChange={(event) => controller.setRate(Number(event.target.value), "slider")}
-              className="h-12 w-full"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Button label="Slower" icon={<SlowerIcon />} size="normal" onClick={() => controller.setRate(settings.rate - RATE_STEP)} />
-              <Button label="Faster" icon={<FasterIcon />} size="normal" onClick={() => controller.setRate(settings.rate + RATE_STEP)} />
-            </div>
-          </div>
+          <StepperRow
+            label="Reading speed"
+            value={settings.rate.toFixed(1)}
+            spoken={`speed ${settings.rate.toFixed(1)}`}
+            down="Slower"
+            up="Faster"
+            onDown={() => controller.setRate(settings.rate - RATE_STEP)}
+            onUp={() => controller.setRate(settings.rate + RATE_STEP)}
+          />
         </Group>
 
         <Group
@@ -93,32 +74,31 @@ export function SettingsScreen() {
             </select>
           </div>
           <RowButton label="Preview voice" icon={<SpeakerIcon />} accent onClick={() => controller.previewVoice()} />
-          <SliderRow
-            id="tone"
+          <StepperRow
             label="Tone"
             value={settings.pitch.toFixed(1)}
-            valueText={`Tone ${settings.pitch.toFixed(1)}`}
-            min={PITCH_MIN}
-            max={PITCH_MAX}
-            current={settings.pitch}
-            onChange={(value) => controller.setPitch(value)}
+            spoken={`tone ${settings.pitch.toFixed(1)}`}
+            down="Lower"
+            up="Higher"
+            onDown={() => controller.setPitch(settings.pitch - STEP, "button")}
+            onUp={() => controller.setPitch(settings.pitch + STEP, "button")}
           />
-          <SliderRow
-            id="volume"
+          <StepperRow
             label="Volume"
             value={String(Math.round(settings.volume * 10))}
-            valueText={`Volume ${Math.round(settings.volume * 10)}`}
-            min={VOLUME_MIN}
-            max={VOLUME_MAX}
-            current={settings.volume}
-            onChange={(value) => controller.setVolume(value)}
+            spoken={`volume ${Math.round(settings.volume * 10)}`}
+            down="Quieter"
+            up="Louder"
+            onDown={() => controller.setVolume(settings.volume - STEP, "button")}
+            onUp={() => controller.setVolume(settings.volume + STEP, "button")}
           />
         </Group>
 
-        <Group id="colours" title="Colours" footer="Automatic follows the iPhone's light or dark setting.">
+        <Group id="colours" title="Colours" footer="Automatic follows the iPhone's light or dark setting. Invert colours swaps light and dark everywhere except the camera picture.">
           {(Object.keys(THEME_NAMES) as Theme[]).map((theme) => (
             <CheckRow key={theme} label={THEME_NAMES[theme]} selected={settings.theme === theme} onSelect={() => controller.setTheme(theme)} />
           ))}
+          <SwitchRow label="Invert colours" on={settings.invert} onToggle={() => controller.setInvert(!settings.invert)} />
         </Group>
 
         <Group id="capture" title="Camera" footer="Minimal guidance only says “hold still” and plays the shutter.">
@@ -174,43 +154,41 @@ function Group({ id, title, footer, children }: { id: string; title: string; foo
   );
 }
 
-/** A slider in a list, in steps of 0.1: Tone and Volume. */
-function SliderRow({
-  id,
+/**
+ * A value changed with two buttons, minus and plus, in steps of 0.1: Speed, Tone, and Volume.
+ * Buttons rather than sliders: a slider needs a precise drag, and VoiceOver users must swipe up
+ * and down on it. Each button's name carries the current value ("Faster, speed 1.2"), and the
+ * new value is said after each press.
+ */
+function StepperRow({
   label,
   value,
-  valueText,
-  min,
-  max,
-  current,
-  onChange,
+  spoken,
+  down,
+  up,
+  onDown,
+  onUp,
 }: {
-  id: string;
   label: string;
   value: string;
-  valueText: string;
-  min: number;
-  max: number;
-  current: number;
-  onChange: (value: number) => void;
+  spoken: string;
+  down: string;
+  up: string;
+  onDown: () => void;
+  onUp: () => void;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <label htmlFor={id} className="flex items-baseline justify-between gap-3 text-xl">
+      <p className="flex items-baseline justify-between gap-3 text-xl">
         <span>{label}</span>
-        <span className="font-bold">{value}</span>
-      </label>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={0.1}
-        value={current}
-        aria-valuetext={valueText}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-12 w-full"
-      />
+        <span className="font-bold" data-testid={`${label.toLowerCase().replace(/ /g, "-")}-value`}>
+          {value}
+        </span>
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Button label={down} aria-label={`${down}, ${spoken}`} icon={<SlowerIcon />} size="large" onClick={onDown} />
+        <Button label={up} aria-label={`${up}, ${spoken}`} icon={<FasterIcon />} size="large" onClick={onUp} />
+      </div>
     </div>
   );
 }

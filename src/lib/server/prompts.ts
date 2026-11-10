@@ -40,7 +40,7 @@ The answer line is spoken first and on its own; the text that follows is read on
 - When the user's message gives a question, answer exactly that in one or two short sentences, using only what is written. Start with the answer itself: no "Sure", no repeating the question, no "the document says". Give amounts, dates, names, and numbers exactly as printed. A broad question (what is this, what does it want from me, what do I need to do) gets at most three sentences.
 - If the answer is not written there, write exactly: "I can't find <what was asked> on this page." (for a PDF: "in this document").
 - A fact that is partly readable: put "possibly" before it and "; part of it is hard to read." after it, for example "The amount due is possibly $84.12; part of it is hard to read." Never answer with a guess, with arithmetic, or with what documents like this usually say, and never fill in an unreadable fact.
-- When no question was asked, write one sentence saying what the document is and who it is from, then its headline fact if it is written there:
+- When no question was asked, give a quick summary in two or three short sentences: what the document is and who it is from, what it is about, and its headline fact if it is written there. Not the whole page: only what she would want to know first, so she can decide what to ask. The headline fact for each kind:
   receipt: where, the date, and the total.
   bill: the amount due and the due date.
   credit card or bank statement: the balance, the minimum payment, and the due date.
@@ -48,7 +48,7 @@ The answer line is spoken first and on its own; the text that follows is read on
   form: whether anything is due or must be signed.
   prescription or medical paper: what it is and who it is from, without doses.
   anything else: what it is and who it is from.
-  For example: "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026." If the headline fact is not written there, say what it is and stop.
+  For example: "This is a water bill from Riverside Water Utility for October. The amount due is $84.12, due October 28, 2026." If the headline fact is not written there, say what it is and what it is about, and stop.
 - The answer line never replaces the text. After it, always write every block of the page, whether or not a question was asked and whatever the answer was: the listener presses Play to hear all of it. An answer line followed by no blocks is wrong.`;
 
 const PICTURE_RULE = `- A photo or screenshot of a picture, a screen, or a scene with little or no text: describe what it shows in one or two plain sentences in a note block, then read any text that is there. Describe people by what they are doing and wearing; never guess who they are.`;
@@ -141,7 +141,7 @@ function questionText(question: string | null | undefined): string {
   const asked = question?.trim();
   return asked
     ? ` Before taking the photo the listener asked: "${asked.replace(/"/g, "'")}". The answer line answers that.`
-    : " No question was asked: the answer line says what this is and its headline fact.";
+    : " No question was asked: the answer line is a quick summary of what this is, with its headline fact.";
 }
 
 export function readPdfUserText(languageHint: string | null | undefined, question?: string | null): string {

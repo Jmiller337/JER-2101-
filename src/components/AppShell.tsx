@@ -15,8 +15,12 @@ import { StartScreen } from "./screens/StartScreen";
 export function AppShell() {
   const controller = useController();
   const { screen, speechUnavailable, talking, heard } = useStore(controller.ui);
-  const { theme } = useStore(controller.settings);
+  const { theme, invert } = useStore(controller.settings);
   useEffect(() => applyTheme(theme), [theme]);
+  useEffect(() => {
+    if (invert) document.documentElement.setAttribute("data-invert", "");
+    else document.documentElement.removeAttribute("data-invert");
+  }, [invert]);
   return (
     <>
       <LiveRegions />

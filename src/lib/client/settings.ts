@@ -34,6 +34,8 @@ export interface Settings {
   volume: number;
   /** Holds that heard something; after three the camera stops explaining hold-to-talk. */
   talkUses: number;
+  /** Swaps light and dark everywhere except the camera picture, like the iPhone's Invert Colours. */
+  invert: boolean;
 }
 
 export const RATE_MIN = 0.7;
@@ -58,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pitch: 1,
   volume: 1,
   talkUses: 0,
+  invert: false,
 };
 
 const SETTINGS_KEY = "docreader.settings.v1";
@@ -88,7 +91,8 @@ function parseStoredSettings(value: unknown): Partial<Settings> | null {
     check("modesLearned", typeof v.modesLearned === "boolean") &&
     check("pitch", typeof v.pitch === "number") &&
     check("volume", typeof v.volume === "number") &&
-    check("talkUses", typeof v.talkUses === "number" && Number.isInteger(v.talkUses) && v.talkUses >= 0);
+    check("talkUses", typeof v.talkUses === "number" && Number.isInteger(v.talkUses) && v.talkUses >= 0) &&
+    check("invert", typeof v.invert === "boolean");
   return valid ? out : null;
 }
 

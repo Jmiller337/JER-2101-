@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectSpoken, openApp, openToCamera, utterances } from "./helpers";
+import { expectSpoken, openApp, openToCamera, pressStep, utterances } from "./helpers";
 
 // docs/PROMPT-2.md sections 5 and 6.
 
@@ -59,22 +59,22 @@ test("the speed goes back to 1 each time the app opens", async ({ page }) => {
   await openToCamera(page);
   await openSettingsFromCamera(page);
   await expect(page.getByText("Speed goes back to 1 each time the app opens.")).toBeVisible();
-  await page.locator("#speed").fill("2");
+  await pressStep(page, "Faster", 10);
   await expectSpoken(page, "Speed 2.0.");
   await page.reload();
   await page.getByRole("button", { name: "Start. Tap anywhere." }).click();
   await expectSpoken(page, "Camera ready.");
   expect((await spokenWith(page)).find((u) => u.text === "Camera ready.")?.rate).toBe(1);
   await openSettingsFromCamera(page);
-  await expect(page.locator("#speed")).toHaveValue("1");
+  await expect(page.getByTestId("reading-speed-value")).toHaveText("1.0");
 });
 
 test("tone and volume are said as they change, kept, and used for every sentence", async ({ page }) => {
   await openToCamera(page);
   await openSettingsFromCamera(page);
-  await page.locator("#tone").fill("1.1");
+  await pressStep(page, "Higher");
   await expectSpoken(page, "Tone 1.1.");
-  await page.locator("#volume").fill("0.8");
+  await pressStep(page, "Quieter", 2);
   await expectSpoken(page, "Volume 8.");
   const last = (await spokenWith(page)).find((u) => u.text === "Volume 8.");
   expect(last).toMatchObject({ pitch: 1.1, volume: 0.8 });
@@ -83,6 +83,19 @@ test("tone and volume are said as they change, kept, and used for every sentence
   await expectSpoken(page, "Camera ready.");
   expect((await spokenWith(page)).find((u) => u.text === "Camera ready.")).toMatchObject({ pitch: 1.1, volume: 0.8 });
   await openSettingsFromCamera(page);
-  await expect(page.locator("#tone")).toHaveValue("1.1");
-  await expect(page.locator("#volume")).toHaveValue("0.8");
+  await expect(page.getByTestId("tone-value")).toHaveText("1.1");
+  await expect(page.getByTestId("volume-value")).toHaveText("8");
+});
+
+test("tone and volume stop at their ends and say so", async ({ page }) => {
+  await openToCamera(page);
+  await openSettingsFromCamera(page);
+  await pressStep(page, "Louder");
+  await expectSpoken(page, "That is the loudest.");
+  await pressStep(page, "Higher", 3);
+  await expectSpoken(page, "Tone 1.2.");
+  await expectSpoken(page, "That is the highest tone.");
+  await pressStep(page, "Lower", 5);
+  await expectSpoken(page, "That is the lowest tone.");
+  await expect(page.getByTestId("tone-value")).toHaveText("0.8");
 });

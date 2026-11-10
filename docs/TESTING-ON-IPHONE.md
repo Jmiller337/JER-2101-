@@ -143,7 +143,7 @@ Turn VoiceOver on (Settings, Accessibility, VoiceOver, or triple-click the side 
 - [ ] Unclear words are written as "(unclear word)" and doubtful ones as "(possibly)".
 - [ ] "Play with app voice" starts the app's own reading for this document, and the reading controls appear.
 - [ ] Nothing is announced twice.
-- [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and moving the speed slider reads the new speed once.
+- [ ] In Settings, turning Automatic capture on or off is read once by VoiceOver ("on" or "off"), and pressing Faster reads its name with the speed ("Faster, speed 1.1") and then the new speed once.
 - [ ] On the camera screen, VoiceOver reads "Camera ready." before the first framing cue.
 - [ ] Holding the screen does nothing in VoiceOver mode. On the camera, a Talk button sits just under More. Double-tap Talk, say "the amount due", double-tap "Stop and send": VoiceOver reads "Amount due." Capture a bill: VoiceOver reads the amount due.
 - [ ] VoiceOver finds the modes as tabs ("PDF, tab, 1 of 3"). Double-tapping one switches to it, VoiceOver says it is selected, and the app adds nothing of its own. (One-finger swipes belong to VoiceOver, so they move between items instead of changing mode; that is expected.)
@@ -203,8 +203,10 @@ Do each with a receipt, a bill, and a statement.
 - [ ] Settings, Privacy: pressing the row reads "This app saves nothing. …" aloud.
 - [ ] After a page has been read, open the iPhone's Photos app: no photo from Document Reader is there.
 - [ ] Set the speed to 2 in Settings. Close Safari completely (swipe it away in the app switcher) and open the app again: it reads at the normal speed, and Settings shows 1.0. The Speed section says "Speed goes back to 1 each time the app opens."
-- [ ] Settings, Voice, Tone: moving the slider says "Tone 1.1." and the voice sounds higher. It is kept after closing Safari.
-- [ ] Settings, Voice, Volume: moving the slider says "Volume 8." and the voice is quieter. The phone's own volume buttons still work. It is kept after closing Safari.
+- [ ] Settings, Voice, Tone: pressing Higher says "Tone 1.1." and the voice sounds higher. It is kept after closing Safari.
+- [ ] Settings, Voice, Volume: pressing Quieter twice says "Volume 8." and the voice is quieter. The phone's own volume buttons still work. It is kept after closing Safari.
+- [ ] Settings, Colours, Invert colours: the whole app swaps light and dark, but the camera picture still looks normal. It is kept after closing Safari.
+- [ ] Leave the camera open for two minutes, hold the screen to talk, and take a picture: the picture never stays frozen for more than about three seconds.
 
 ## 12. French letters (only after translation is switched on)
 

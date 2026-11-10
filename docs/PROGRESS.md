@@ -218,6 +218,13 @@ The owner asked to drop the spoken placement instruction, said the capture scree
 - **`npm run rehearse`** reads the test bill and PDF through the real API and checks the answers word for word (the amount due, the account number, the late fee, two questions, the PDF's two pages), printing the time to the first word and the speed used. Run it within the hour before the demo: it also warms the caches.
 - **Not verified here:** no API key in the build environment, so fast mode and the real timings have only been exercised against the scripted model. The rehearsal is what shows them.
 
+## After the demo rehearsal
+
+- **The camera no longer stays frozen.** iOS can stop a camera's picture without ending it (when the microphone starts listening, after a photo, after a call). The camera screen now checks once a second that the picture is still moving; after a second and a half still it nudges the video, and after three seconds it restarts the camera quietly (`FreezeWatch` in `src/lib/client/camera/camera.ts`).
+- **A quick summary first.** With nothing asked, the app now says two or three short sentences (what it is, who it is from, what it is about, and the headline fact), then asks what she wants to know. Play still reads every word.
+- **Plus and minus buttons instead of sliders** in Settings, by the owner's request: Speed (Slower, Faster), Tone (Lower, Higher), and Volume (Quieter, Louder). Each button's name carries the current value for VoiceOver, every press says the new value, and the ends say so ("That is the loudest.").
+- **Invert colours**, a switch at the end of the Colours group: every colour is swapped for its opposite, like the iPhone's own Invert Colours, except the camera picture and photos. Remembered, and applied before the first paint.
+
 ## What still needs the owner
 
 0. **Run `npm run rehearse` within the hour before the demo** (`docs/SETUP.md`, "Before the demo"), and pull and deploy first.

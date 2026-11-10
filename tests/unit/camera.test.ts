@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isInAppBrowser } from "@/lib/client/camera/camera";
+import { FREEZE, FreezeWatch } from "@/lib/client/camera/camera";
 import { targetSize } from "@/lib/client/camera/prepare";
 import { bestOfBurst } from "@/lib/client/camera/camera";
 import { applyLevels, brightnessHistogram, enhanceForReading, levelsFor, MAX_GAIN } from "@/lib/client/camera/enhance";
@@ -104,5 +105,38 @@ describe("bestOfBurst", () => {
     const result = await bestOfBurst(() => "only", () => ((scored = true), 1), 1, async () => undefined);
     expect(result.item).toBe("only");
     expect(scored).toBe(false);
+  });
+});
+
+describe("FreezeWatch", () => {
+  it("leaves a moving picture alone", () => {
+    const watch = new FreezeWatch();
+    for (let t = 0; t < 20; t++) expect(watch.check(t * 0.03, false, t * 1000)).toBe("ok");
+  });
+
+  it("nudges a picture that stopped, then restarts the camera if it stays stopped", () => {
+    const watch = new FreezeWatch();
+    expect(watch.check(1, false, 0)).toBe("ok");
+    expect(watch.check(1, false, 1000)).toBe("ok");
+    expect(watch.check(1, false, 1000 + FREEZE.nudgeMs)).toBe("nudge");
+    expect(watch.check(1, false, 1000 + FREEZE.nudgeMs + 500)).toBe("ok");
+    expect(watch.check(1, false, 1000 + FREEZE.restartMs)).toBe("restart");
+  });
+
+  it("recovers without a restart when the nudge works", () => {
+    const watch = new FreezeWatch();
+    watch.check(1, false, 0);
+    watch.check(1, false, 1000);
+    expect(watch.check(1, false, 1000 + FREEZE.nudgeMs)).toBe("nudge");
+    expect(watch.check(1.5, false, 4000)).toBe("ok");
+    expect(watch.check(2, false, 5000)).toBe("ok");
+  });
+
+  it("restarts at once when the track ended, but not over and over", () => {
+    const watch = new FreezeWatch();
+    watch.check(1, false, 0);
+    expect(watch.check(1, true, 1000)).toBe("restart");
+    expect(watch.check(1, true, 2000)).toBe("ok");
+    expect(watch.check(1, true, 1000 + FREEZE.restartGapMs)).toBe("restart");
   });
 });

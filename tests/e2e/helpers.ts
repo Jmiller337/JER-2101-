@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { installFakeSpeech } from "./fakeSpeech";
@@ -156,6 +157,11 @@ export async function pressPlay(page: Page) {
   await page.getByRole("navigation", { name: "Reading controls" }).getByRole("button", { name: "Play" }).click();
 }
 
+/** Presses a Settings minus or plus button (Slower, Faster, Lower, Higher, Quieter, Louder) `times` times. */
+export async function pressStep(page: Page, label: string, times = 1) {
+  for (let i = 0; i < times; i++) await page.getByRole("button", { name: new RegExp(`^${label}, `) }).click();
+}
+
 /** Runs axe on the current screen and fails with a readable list of violations. */
 export async function expectNoAxeViolations(page: Page, screen: string) {
   const results = await new AxeBuilder({ page }).analyze();
@@ -167,7 +173,10 @@ export async function expectNoAxeViolations(page: Page, screen: string) {
 
 /** Launch options that feed Chromium's fake camera from one of the generated videos. */
 export function cameraVideo(name: string) {
+  // These options replace the config's launch options, so they name the same browser it does.
+  const systemChromium = process.env.PW_CHROMIUM_PATH ?? "/opt/pw-browsers/chromium";
   return {
+    executablePath: existsSync(systemChromium) ? systemChromium : undefined,
     args: [
       "--use-fake-ui-for-media-stream",
       "--use-fake-device-for-media-stream",

@@ -61,6 +61,11 @@ describe("reading prompts", () => {
       }
       expect(prompt).toContain("without doses");
     });
+
+    it(`the ${name} prompt opens with a quick summary, not the whole page, when nothing was asked`, () => {
+      expect(prompt).toContain("give a quick summary in two or three short sentences");
+      expect(prompt).toContain("Not the whole page: only what she would want to know first, so she can decide what to ask.");
+    });
   }
 
   it("the photo prompt describes pictures and screenshots instead of giving up on them", () => {

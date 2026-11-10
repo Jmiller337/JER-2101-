@@ -5,7 +5,7 @@ import { Announcer, type AnnounceOptions, type Channel } from "./announce/announ
 import { LiveRegions } from "./announce/liveRegions";
 import { ApiError, createApiClient, type ApiClient } from "./api";
 import { Sounds } from "./audio/sounds";
-import { CameraError, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
+import { CameraError, FreezeWatch, startCamera, type CameraErrorKind, type CameraHandle } from "./camera/camera";
 import { FrameSampler } from "./camera/frameSampler";
 import { laplacianVariance, toLuma, type Luma } from "./vision/analysis";
 import { blobToBase64, imageFromFile, prepareImage, type PreparedImage } from "./camera/prepare";
@@ -220,6 +220,9 @@ export class AppController {
   /** A question asked while a page was still arriving: answered once all of it is here. */
   private queuedQuestion: string | null = null;
   private readonly framingSounds = new FramingSounds();
+  /** Restarts a camera whose picture has frozen while the screen stays open. */
+  private readonly freezeWatch = new FreezeWatch();
+  private freezeTimer: unknown = null;
 
   constructor(env: ControllerEnv = browserEnv()) {
     this.env = env;
@@ -470,6 +473,7 @@ export class AppController {
       console.info("camera started", camera.info());
       this.speakCameraIntro();
       this.startGuidance();
+      this.startFreezeWatch();
     } catch (err) {
       if (token !== this.videoToken) return;
       const kind: CameraErrorKind = err instanceof CameraError ? err.kind : "unknown";
@@ -504,6 +508,7 @@ export class AppController {
   detachVideo(): void {
     this.videoToken += 1;
     this.videoEl = null;
+    this.stopFreezeWatch();
     this.stopGuidance();
     this.resolveCameraWaiters(null);
     if (this.camera) {
@@ -512,6 +517,39 @@ export class AppController {
       this.camera = null;
     }
     if (this.ui.get().cameraStatus !== "off") this.ui.update({ cameraStatus: "off" });
+  }
+
+  /** Checks once a second that the camera's picture is still moving. */
+  private startFreezeWatch(): void {
+    this.stopFreezeWatch();
+    this.freezeWatch.reset();
+    const tick = () => {
+      this.freezeTimer = this.env.timers.setTimeout(tick, 1000);
+      const camera = this.camera;
+      const video = this.videoEl;
+      const ui = this.ui.get();
+      if (!camera || !video || ui.screen !== "camera" || ui.capturing || document.visibilityState !== "visible") {
+        this.freezeWatch.reset();
+        return;
+      }
+      const verdict = this.freezeWatch.check(camera.video.currentTime, camera.track.readyState === "ended", this.now());
+      if (verdict === "nudge") {
+        void camera.video.play().catch(() => undefined);
+      } else if (verdict === "restart") {
+        console.warn("camera picture froze; starting the camera again");
+        // Quietly: the user is still on the same screen and hears nothing new.
+        this.cameraIntroPending = "none";
+        void this.attachVideo(video);
+      }
+    };
+    this.freezeTimer = this.env.timers.setTimeout(tick, 1000);
+  }
+
+  private stopFreezeWatch(): void {
+    if (this.freezeTimer !== null) {
+      this.env.timers.clearTimeout(this.freezeTimer);
+      this.freezeTimer = null;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1771,7 +1809,10 @@ export class AppController {
   /** Tone is the voice's pitch, 0.8 to 1.2 (docs/PROMPT-2.md section 6). */
   setPitch(pitch: number, source: "slider" | "button" = "slider"): void {
     const next = clampPitch(pitch);
-    if (next === this.settings.get().pitch) return;
+    if (next === this.settings.get().pitch) {
+      if (source === "button") this.say(pitch > next ? "That is the highest tone." : "That is the lowest tone.");
+      return;
+    }
     this.updateSettings({ pitch: next });
     const text = `Tone ${next.toFixed(1)}.`;
     if (source === "slider") this.sayUnlessVoiceOver(text);
@@ -1781,7 +1822,10 @@ export class AppController {
   /** Volume 0.5 to 1.0, said as "Volume 5." to "Volume 10.". The phone's buttons still work. */
   setVolume(volume: number, source: "slider" | "button" = "slider"): void {
     const next = clampVolume(volume);
-    if (next === this.settings.get().volume) return;
+    if (next === this.settings.get().volume) {
+      if (source === "button") this.say(volume > next ? "That is the loudest." : "That is the quietest.");
+      return;
+    }
     this.updateSettings({ volume: next });
     const text = `Volume ${Math.round(next * 10)}.`;
     if (source === "slider") this.sayUnlessVoiceOver(text);
@@ -1807,6 +1851,12 @@ export class AppController {
     this.updateSettings({ sounds: on });
     this.sayUnlessVoiceOver(on ? "Sounds on." : "Sounds off.");
     if (on) this.sounds.tick();
+  }
+
+  /** VoiceOver reads the switch's new state itself. */
+  setInvert(invert: boolean): void {
+    this.updateSettings({ invert });
+    this.sayUnlessVoiceOver(invert ? "Colours inverted." : "Colours not inverted.");
   }
 
   setTheme(theme: Theme): void {

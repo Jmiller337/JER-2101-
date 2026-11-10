@@ -48,7 +48,7 @@ describe("POST /api/read", () => {
     const content = params.messages[0]!.content as Array<{ type: string; text?: string }>;
     expect(content.map((c) => c.type)).toEqual(["image", "text"]);
     expect(content[1]!.text).toBe(
-      "Page 3. Read this page. The document is probably in es. No question was asked: the answer line says what this is and its headline fact.",
+      "Page 3. Read this page. The document is probably in es. No question was asked: the answer line is a quick summary of what this is, with its headline fact.",
     );
   });
 
